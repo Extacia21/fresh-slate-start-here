@@ -16,7 +16,6 @@ const MainLayoutAuthWrapper = () => {
       const sessionKey = 'auth-session-welcomed';
       
       // Get session ID and last welcomed session from localStorage
-      // Use user.id instead of session.id for consistency
       const sessionId = data.session?.user?.id;
       const lastWelcomedSession = localStorage.getItem(sessionKey);
       
