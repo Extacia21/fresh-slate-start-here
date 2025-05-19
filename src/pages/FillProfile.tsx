@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, User, Map, Droplet, Phone } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
+import { supabase } from '@/integrations/supabase/client';
 
 const FillProfile = () => {
   const [formData, setFormData] = useState({
@@ -20,6 +20,21 @@ const FillProfile = () => {
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const [email, setEmail] = useState<string | null>(null);
+  const [name, setName] = useState<string | null>(null);
+
+  // Get email from session storage (passed from signup)
+  useEffect(() => {
+    const storedEmail = sessionStorage.getItem("newUserEmail");
+    const storedName = sessionStorage.getItem("newUserName");
+    if (!storedEmail) {
+      // If no email is found, redirect to signup
+      navigate("/signup");
+    } else {
+      setEmail(storedEmail);
+      setName(storedName);
+    }
+  }, [navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -46,7 +61,7 @@ const FillProfile = () => {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.emergencyContact || !formData.emergencyPhone) {
       toast({
         title: "Error",
@@ -58,15 +73,72 @@ const FillProfile = () => {
     
     setIsLoading(true);
     
-    // Simulate API request
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      // Get the user ID if they signed up and got an email confirmation automatically
+      const { data: authData } = await supabase.auth.getSession();
+      const userId = authData.session?.user?.id;
+      
+      if (userId) {
+        // User is already authenticated, update their profile
+        const { error } = await supabase
+          .from('profiles')
+          .upsert({
+            id: userId,
+            first_name: name?.split(' ')[0] || '',
+            last_name: name?.split(' ').slice(1).join(' ') || '',
+            phone: formData.phone,
+            address: formData.address,
+            blood_type: formData.bloodType,
+            emergency_contact_name: formData.emergencyContact,
+            emergency_contact_phone: formData.emergencyPhone,
+            emergency_contact_relation: formData.emergencyRelation,
+          });
+          
+        if (error) {
+          throw error;
+        }
+        
+        toast({
+          title: "Profile completed",
+          description: "Your profile has been updated successfully",
+        });
+        
+        navigate("/app"); // Direct to app if already authenticated
+      } else {
+        // Store profile data in localStorage to be used after login
+        const profileData = {
+          first_name: name?.split(' ')[0] || '',
+          last_name: name?.split(' ').slice(1).join(' ') || '',
+          phone: formData.phone,
+          address: formData.address,
+          blood_type: formData.bloodType,
+          emergency_contact_name: formData.emergencyContact,
+          emergency_contact_phone: formData.emergencyPhone,
+          emergency_contact_relation: formData.emergencyRelation,
+        };
+        
+        localStorage.setItem("pendingProfileData", JSON.stringify(profileData));
+        
+        toast({
+          title: "Profile information saved",
+          description: "Please sign in to complete your registration",
+        });
+        
+        // Clean up session storage
+        sessionStorage.removeItem("newUserEmail");
+        sessionStorage.removeItem("newUserName");
+        
+        navigate("/signin");
+      }
+    } catch (error: any) {
       toast({
-        title: "Profile completed",
-        description: "Your profile has been updated successfully",
+        title: "Error",
+        description: error.message || "Failed to save profile data",
+        variant: "destructive",
       });
-      navigate("/app");
-    }, 1000);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

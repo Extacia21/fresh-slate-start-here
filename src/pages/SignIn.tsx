@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,14 @@ const SignIn = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { signIn, user } = useAuth();
+
+  // Redirect if user is already authenticated
+  useEffect(() => {
+    if (user) {
+      navigate("/app");
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,6 +62,11 @@ const SignIn = () => {
                 title: "Welcome back",
                 description: "You have successfully signed in",
               });
+              
+              // Set flag for authenticated user
+              localStorage.setItem("isAuthenticated", "true");
+              
+              // Redirect to app home
               navigate("/app");
             }
             setIsLoading(false);
@@ -72,6 +84,11 @@ const SignIn = () => {
           title: "Welcome back",
           description: "You have successfully signed in",
         });
+        
+        // Set flag for authenticated user
+        localStorage.setItem("isAuthenticated", "true");
+        
+        // Redirect to app home
         navigate("/app");
       }
     } catch (error: any) {

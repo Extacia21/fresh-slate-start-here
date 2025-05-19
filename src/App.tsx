@@ -56,6 +56,7 @@ function App() {
                 <Route path="/signin" element={<SignIn />} />
                 <Route path="/signup" element={<SignUp />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/fill-profile" element={<FillProfile />} />
                 
                 {/* Protected routes */}
                 <Route path="/app" element={<MainLayoutAuthWrapper />}>

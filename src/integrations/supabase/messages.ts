@@ -23,6 +23,22 @@ export const getMessages = async (chatRoomId?: string, recipientId?: string, use
         is_group_message: true,
         message_text: 'This is a test message',
         created_at: new Date().toISOString()
+      },
+      {
+        id: '2',
+        sender_id: 'system',
+        chat_room_id: 'community-emergency',
+        is_group_message: true,
+        message_text: 'Emergency alert: Flash flood warning in downtown area',
+        created_at: new Date(Date.now() - 1800000).toISOString() // 30 minutes ago
+      },
+      {
+        id: '3',
+        sender_id: 'user-2',
+        chat_room_id: 'community-emergency',
+        is_group_message: true,
+        message_text: 'Is everyone safe downtown?',
+        created_at: new Date(Date.now() - 1700000).toISOString() // 28 minutes ago
       }
     ];
     
@@ -51,6 +67,17 @@ export const sendMessage = async (message: Omit<Message, 'id' | 'created_at'>) =
       id: `msg-${Date.now()}`,
       created_at: new Date().toISOString()
     };
+    
+    // Simulate real-time message delivery by dispatching a custom event
+    setTimeout(() => {
+      const messageEvent = new CustomEvent('message-event', {
+        detail: {
+          type: 'new-message',
+          ...newMessage
+        }
+      });
+      window.dispatchEvent(messageEvent);
+    }, 500); // Small delay to simulate network
     
     return { data: [newMessage], error: null };
   } catch (error) {

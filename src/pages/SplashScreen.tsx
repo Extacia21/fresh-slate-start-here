@@ -2,21 +2,35 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ShieldAlert } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const SplashScreen = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const checkAuthAndRedirect = async () => {
       // Check if user has seen onboarding
       const hasSeenOnboarding = localStorage.getItem("hasSeenOnboarding") === "true";
-      if (hasSeenOnboarding) {
-        // Check if user is authenticated
-        const isAuthenticated = localStorage.getItem("isAuthenticated") === "true";
-        navigate(isAuthenticated ? "/app" : "/signin");
-      } else {
+      
+      if (!hasSeenOnboarding) {
         navigate("/onboarding");
+        return;
       }
+      
+      // Check if user is authenticated with Supabase
+      const { data } = await supabase.auth.getSession();
+      const isAuthenticated = !!data.session;
+      
+      // Update localStorage flag
+      localStorage.setItem("isAuthenticated", isAuthenticated ? "true" : "false");
+      
+      // Redirect based on auth state
+      navigate(isAuthenticated ? "/app" : "/signin");
+    };
+    
+    // Add a small delay for the splash screen effect
+    const timer = setTimeout(() => {
+      checkAuthAndRedirect();
     }, 2000);
 
     return () => clearTimeout(timer);

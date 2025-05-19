@@ -60,19 +60,24 @@ export const useSubscribeToMessages = (
   chatRoomId: string | undefined,
   callback: (message: Message) => void
 ) => {
-  // For now, we'll use a simple event-based approach since the table doesn't exist in Supabase
-  const eventHandler = (event: any) => {
-    if (event.type === 'new-message' && 
-        (!chatRoomId || event.detail?.chat_room_id === chatRoomId)) {
+  const handleMessageEvent = (event: CustomEvent) => {
+    if (event.detail && event.detail.type === 'new-message' && 
+        (!chatRoomId || event.detail.chat_room_id === chatRoomId)) {
       callback(event.detail as Message);
     }
   };
   
   // Set up subscription
-  window.addEventListener('message-event', eventHandler);
-  
-  // Return cleanup function
-  return () => {
-    window.removeEventListener('message-event', eventHandler);
-  };
+  useEffect(() => {
+    // Cast to any since we're using a custom event type
+    window.addEventListener('message-event', handleMessageEvent as any);
+    
+    // Return cleanup function
+    return () => {
+      window.removeEventListener('message-event', handleMessageEvent as any);
+    };
+  }, [chatRoomId, callback]);
 };
+
+// Missing import
+import { useEffect } from 'react';

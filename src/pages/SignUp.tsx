@@ -50,14 +50,17 @@ const SignUp = () => {
           variant: "destructive",
         });
       } else if (data) {
+        // Store email for the fill profile step
+        sessionStorage.setItem("newUserEmail", email);
+        sessionStorage.setItem("newUserName", name);
+        
         toast({
           title: "Account created",
-          description: "Your account has been created successfully. You can now sign in.",
+          description: "Please complete your profile information.",
         });
-        // Wait briefly before redirecting to sign-in
-        setTimeout(() => {
-          navigate("/signin");
-        }, 1500);
+        
+        // Redirect to fill profile page
+        navigate("/fill-profile");
       }
     } catch (error: any) {
       toast({

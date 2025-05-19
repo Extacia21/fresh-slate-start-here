@@ -2,47 +2,24 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import type { Report } from "@/integrations/supabase/reports";
+import type { Report, getReports, getPublicReports, createReport } from "@/integrations/supabase/reports";
 
 export type { Report };
 
-// Simulate fetch for reports
-const fetchReports = async () => {
-  try {
-    // Make API call
-    const response = await fetch('/api/reports');
-    if (!response.ok) {
-      throw new Error('Failed to fetch reports');
-    }
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching reports:', error);
-    return [];
-  }
-};
-
-// Simulate fetch for user reports
-const fetchUserReports = async (userId: string) => {
-  try {
-    // Make API call
-    const response = await fetch(`/api/reports/user/${userId}`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch user reports');
-    }
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching user reports:', error);
-    return [];
-  }
-};
+// Import mocked functions
+import { getReports, getPublicReports, createReport } from "@/integrations/supabase/reports";
 
 export const useGetReports = () => {
   return useQuery({
     queryKey: ['reports'],
     queryFn: async () => {
-      // In a real app, this would fetch from Supabase
-      const reports = await fetchReports();
-      return reports as Report[];
+      const { data, error } = await getReports();
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      return data as Report[];
     },
   });
 };
@@ -55,9 +32,15 @@ export const useGetUserReports = () => {
     queryFn: async () => {
       if (!user) return [];
       
-      // In a real app, this would fetch from Supabase
-      const reports = await fetchUserReports(user.id);
-      return reports as Report[];
+      const { data, error } = await getReports();
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      // Filter to user's reports only
+      const userReports = data?.filter(report => report.user_id === user.id) || [];
+      return userReports as Report[];
     },
     enabled: !!user,
   });
@@ -74,23 +57,14 @@ export const useCreateReport = () => {
       const newReport = {
         ...report,
         user_id: user.id,
+        status: 'active'
       };
       
-      // In a real app, this would insert into Supabase
-      // For now, we'll just simulate a successful response
-      const response = await fetch('/api/reports', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newReport),
-      });
+      const { data, error } = await createReport(newReport);
       
-      if (!response.ok) {
-        throw new Error('Failed to create report');
+      if (error) {
+        throw new Error(error.message);
       }
-      
-      const data = await response.json();
       
       // Dispatch a custom event to notify subscribers
       const reportEvent = new CustomEvent('report-created', {
@@ -110,9 +84,6 @@ export const useCreateReport = () => {
       queryClient.invalidateQueries({
         queryKey: ['user-reports'],
       });
-      queryClient.invalidateQueries({
-        queryKey: ['alerts'],
-      });
     },
   });
 };
@@ -126,9 +97,14 @@ export const useSubscribeToReports = (callback: (report: Report) => void) => {
     }
   };
 
-  window.addEventListener('report-created', handleReportCreated);
+  useEffect(() => {
+    window.addEventListener('report-created', handleReportCreated);
 
-  return () => {
-    window.removeEventListener('report-created', handleReportCreated);
-  };
+    return () => {
+      window.removeEventListener('report-created', handleReportCreated);
+    };
+  }, [callback]);
 };
+
+// Missing import
+import { useEffect } from 'react';

@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
+// The component was showing a TypeScript error because ProtectedRoute expected children as ReactNode
 const MainLayoutAuthWrapper = () => {
   const [hasShownWelcomeToast, setHasShownWelcomeToast] = useState(false);
   

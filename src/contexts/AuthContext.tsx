@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 
 // Updated AuthContextType to match Supabase's actual return types
 type AuthContextType = {
@@ -29,6 +29,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Check for pending profile data and save it when user authenticates
+  const checkAndSavePendingProfile = async (userId: string) => {
+    const pendingProfileData = localStorage.getItem("pendingProfileData");
+    if (pendingProfileData && userId) {
+      try {
+        const profileData = JSON.parse(pendingProfileData);
+        
+        // Save to profiles table
+        const { error } = await supabase
+          .from('profiles')
+          .upsert({
+            id: userId,
+            ...profileData
+          });
+          
+        if (!error) {
+          // Clean up stored data
+          localStorage.removeItem("pendingProfileData");
+          
+          toast.success("Profile data saved successfully");
+        }
+      } catch (e) {
+        console.error("Failed to save pending profile data:", e);
+      }
+    }
+  };
+
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -37,20 +64,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(newSession?.user ?? null);
         setIsLoading(false);
         
-        // You can add additional actions here based on events
+        // Handle authentication events
         if (event === "SIGNED_OUT") {
           navigate("/signin");
-          toast({
-            title: "Signed out successfully",
+          localStorage.removeItem("isAuthenticated");
+          toast.success("Signed out successfully", {
             description: "Come back soon!",
-            duration: 3000, // Auto-dismiss after 3 seconds
+            duration: 3000,
           });
         } else if (event === "SIGNED_IN") {
-          toast({
-            title: "Signed in successfully",
-            description: "Welcome to the application",
-            duration: 3000, // Auto-dismiss after 3 seconds
-          });
+          localStorage.setItem("isAuthenticated", "true");
+          
+          // Save any pending profile data
+          if (newSession?.user) {
+            checkAndSavePendingProfile(newSession.user.id);
+          }
+          
+          // Note: toast for sign in is handled in MainLayoutAuthWrapper
         }
       }
     );
@@ -60,6 +90,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       setIsLoading(false);
+      
+      // If user is authenticated, set localStorage flag
+      if (currentSession?.user) {
+        localStorage.setItem("isAuthenticated", "true");
+      }
     });
 
     return () => {

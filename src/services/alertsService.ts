@@ -1,246 +1,84 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { Report, getReports, getPublicReports } from "@/integrations/supabase/reports";
+import type { Report } from "@/integrations/supabase/reports";
+import { getReports } from "@/integrations/supabase/reports";
 
-export interface Alert {
-  id: string;
-  type: string;
-  title: string;
-  description: string;
-  location?: string;
-  severity: string;
-  icon?: string;
-  created_at: string;
-  source?: string; // To distinguish between system alerts and user reports
+// Since we don't have an alerts table, we'll use reports as alerts
+export interface Alert extends Report {
+  severity: "critical" | "high" | "medium" | "low";
 }
 
-// Interface to match what's in the database
-interface AlertFromDB {
-  id: string;
-  alert_type: string;
-  title: string;
-  description: string;
-  latitude: number;
-  longitude: number;
-  severity: string;
-  created_at: string;
-  end_time?: string;
-  created_by?: string;
-  updated_at?: string;
-}
-
-export const useGetAlerts = () => {
+export const useGetRecentAlerts = (limit = 10) => {
   return useQuery({
-    queryKey: ['alerts'],
+    queryKey: ['alerts', limit],
     queryFn: async () => {
-      // Get system alerts
-      const { data: alertsData, error: alertsError } = await supabase
-        .from('alerts')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Get alerts (using reports as mock)
+      const { data, error } = await getReports();
       
-      if (alertsError) {
-        throw new Error(alertsError.message);
+      if (error) {
+        throw new Error(error.message);
       }
       
-      // Get user reports that should be shown as alerts - using our custom function
-      const { data: reportsData, error: reportsError } = await getPublicReports();
-      
-      if (reportsError) {
-        throw new Error(reportsError.message);
-      }
-      
-      // Map the alerts from database to our Alert interface
-      const systemAlerts = (alertsData || []).map((alert: AlertFromDB) => ({
-        id: alert.id,
-        type: alert.alert_type || 'other',
-        title: alert.title,
-        description: alert.description,
-        location: `${alert.latitude}, ${alert.longitude}`,
-        severity: alert.severity,
-        icon: getIconForAlertType(alert.alert_type),
-        created_at: alert.created_at,
-        source: 'system'
-      }));
-      
-      // Map the reports to look like alerts
-      const reportAlerts = (reportsData || []).map((report: Report) => ({
-        id: report.id,
-        type: report.category || 'other',
-        title: report.title,
-        description: report.description,
-        location: report.location,
-        // Map report categories to appropriate severity
-        severity: reportCategoryToSeverity(report.category),
-        icon: getIconForAlertType(report.category),
-        created_at: report.created_at,
-        source: 'user-reported'
-      }));
-      
-      // Combine and sort by creation date
-      const combinedAlerts = [...systemAlerts, ...reportAlerts].sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-      
-      return combinedAlerts as Alert[];
+      // Sort by created_at (newest first) and limit
+      const alerts = data
+        ?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, limit)
+        .map(report => ({
+          ...report,
+          severity: report.severity || "medium"
+        }));
+        
+      return alerts as Alert[];
     },
   });
 };
 
-export const useGetRecentAlerts = (limit = 5) => {
+export const useGetAlertById = (id: string | undefined) => {
   return useQuery({
-    queryKey: ['recent-alerts', limit],
+    queryKey: ['alert', id],
     queryFn: async () => {
-      // Get system alerts
-      const { data: alertsData, error: alertsError } = await supabase
-        .from('alerts')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(Math.ceil(limit / 2)); // Split limit between alerts and reports
+      if (!id) return null;
       
-      if (alertsError) {
-        throw new Error(alertsError.message);
+      // Get all reports and find the matching one
+      const { data, error } = await getReports();
+      
+      if (error) {
+        throw new Error(error.message);
       }
       
-      // Get user reports that should be shown as alerts - using our custom function
-      const { data: reportsData, error: reportsError } = await getPublicReports();
-      
-      if (reportsError) {
-        throw new Error(reportsError.message);
+      const alert = data?.find(report => report.id === id);
+      if (!alert) {
+        throw new Error("Alert not found");
       }
       
-      // Map the alerts from database to our Alert interface
-      const systemAlerts = (alertsData || []).map((alert: AlertFromDB) => ({
-        id: alert.id,
-        type: alert.alert_type || 'other',
-        title: alert.title,
-        description: alert.description,
-        location: `${alert.latitude}, ${alert.longitude}`,
-        severity: alert.severity,
-        icon: getIconForAlertType(alert.alert_type),
-        created_at: alert.created_at,
-        source: 'system'
-      }));
-      
-      // Map the reports to look like alerts
-      const reportAlerts = (reportsData || []).slice(0, Math.ceil(limit / 2)).map((report: Report) => ({
-        id: report.id,
-        type: report.category || 'other',
-        title: report.title,
-        description: report.description,
-        location: report.location,
-        // Map report categories to appropriate severity
-        severity: reportCategoryToSeverity(report.category),
-        icon: getIconForAlertType(report.category),
-        created_at: report.created_at,
-        source: 'user-reported'
-      }));
-      
-      // Combine and sort by creation date, limiting to the requested number
-      const combinedAlerts = [...systemAlerts, ...reportAlerts]
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        .slice(0, limit);
-      
-      return combinedAlerts as Alert[];
+      return alert as Alert;
     },
+    enabled: !!id,
   });
 };
 
 export const useSubscribeToAlerts = (callback: (alert: Alert) => void) => {
-  // Subscribe to system alerts
-  const alertsChannel = supabase
-    .channel('public:alerts')
-    .on('postgres_changes', 
-      { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'alerts'
-      },
-      (payload) => {
-        // Convert payload to match Alert interface
-        const newAlert = {
-          id: payload.new.id,
-          type: payload.new.alert_type || 'other',
-          title: payload.new.title,
-          description: payload.new.description,
-          location: `${payload.new.latitude}, ${payload.new.longitude}`,
-          severity: payload.new.severity,
-          icon: getIconForAlertType(payload.new.alert_type),
-          created_at: payload.new.created_at,
-          source: 'system'
-        } as Alert;
-        
-        callback(newAlert);
-      }
-    )
-    .subscribe();
-
-  // We'll simulate subscription to reports with an event listener
-  // In a real app, this would be a proper subscription to the reports table
-  const handleReportEvent = (event: any) => {
+  // Since reports are our alerts, we'll subscribe to report creation events
+  const handleReportCreated = (event: any) => {
     if (event.detail && event.detail.type === 'new-report') {
-      const report = event.detail.report as Report;
-      
-      if (report.is_public) {
-        // Convert report to alert format
-        const newAlert = {
-          id: report.id,
-          type: report.category || 'other',
-          title: report.title,
-          description: report.description,
-          location: report.location,
-          severity: reportCategoryToSeverity(report.category),
-          icon: getIconForAlertType(report.category),
-          created_at: report.created_at,
-          source: 'user-reported'
-        } as Alert;
-        
-        callback(newAlert);
-      }
+      // Convert report to alert format
+      const alert: Alert = {
+        ...event.detail.report,
+        severity: event.detail.report.severity || "medium"
+      };
+      callback(alert);
     }
   };
-  
-  window.addEventListener('report-created', handleReportEvent);
 
-  return () => {
-    supabase.removeChannel(alertsChannel);
-    window.removeEventListener('report-created', handleReportEvent);
-  };
+  useEffect(() => {
+    window.addEventListener('report-created', handleReportCreated);
+
+    return () => {
+      window.removeEventListener('report-created', handleReportCreated);
+    };
+  }, [callback]);
 };
 
-// Helper function to get icon based on alert type
-function getIconForAlertType(alertType: string): string {
-  switch (alertType?.toLowerCase()) {
-    case 'weather':
-      return 'cloud-rain';
-    case 'police':
-      return 'shield';
-    case 'fire':
-      return 'flame';
-    case 'health':
-      return 'heart-pulse';
-    case 'traffic':
-      return 'car';
-    default:
-      return 'alert-triangle';
-  }
-}
-
-// Helper function to map report category to alert severity
-function reportCategoryToSeverity(category: string): string {
-  switch (category?.toLowerCase()) {
-    case 'fire':
-      return 'high';
-    case 'police':
-      return 'high';
-    case 'health':
-      return 'medium';
-    case 'weather':
-      return 'medium';
-    case 'traffic':
-      return 'low';
-    default:
-      return 'medium';
-  }
-}
+// Missing import
+import { useEffect } from 'react';
