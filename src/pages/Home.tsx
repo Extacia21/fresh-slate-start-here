@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, MapPin, FileText, Phone, MessageCircle, Shield, AlertTriangle, Cloud, CloudRain, CloudLightning, Info } from "lucide-react";
 import QuickAction from "@/components/common/QuickAction";
@@ -42,20 +42,19 @@ const Home = () => {
     }
   }, [alertsData]);
 
-  // Subscribe to new alerts
-  useEffect(() => {
-    const handleNewAlert = (newAlert: Alert) => {
-      setRecentAlerts(prev => [newAlert, ...prev.slice(0, 4)]);
-      
-      toast({
-        title: `New ${newAlert.type} Alert`,
-        description: newAlert.title,
-        duration: 5000,
-      });
-    };
+  // Handle new alert callback
+  const handleNewAlert = useCallback((newAlert: Alert) => {
+    setRecentAlerts(prev => [newAlert, ...prev.slice(0, 4)]);
     
-    useSubscribeToAlerts(handleNewAlert);
+    toast({
+      title: `New ${newAlert.type} Alert`,
+      description: newAlert.title,
+      duration: 5000,
+    });
   }, []);
+  
+  // Subscribe to new alerts using the hook properly
+  useSubscribeToAlerts(handleNewAlert);
 
   // Mock user location for sharing
   const userLocation = "37.7749,-122.4194"; // San Francisco coordinates

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Bell, Filter } from "lucide-react";
 import AlertCard from "@/components/common/AlertCard";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,34 +22,33 @@ const Alerts = () => {
     }
   }, [alertsData]);
 
-  // Subscribe to new alerts
-  useEffect(() => {
-    const handleNewAlert = (newAlert: Alert) => {
-      setAlerts(prevAlerts => {
-        // Check if alert already exists to prevent duplicates
-        if (prevAlerts.some(alert => alert.id === newAlert.id)) {
-          return prevAlerts;
-        }
-        
-        // Add new alert and sort by creation date
-        const updatedAlerts = [newAlert, ...prevAlerts]
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        
-        // Show toast notification for new alert
-        toast.info(`New ${newAlert.source === 'user-reported' ? 'User Report' : 'Alert'}: ${newAlert.title}`, {
-          description: newAlert.description.substring(0, 50) + (newAlert.description.length > 50 ? '...' : ''),
-          action: {
-            label: 'View',
-            onClick: () => navigate(`/app/alerts/${newAlert.id}`),
-          },
-        });
-        
-        return updatedAlerts;
+  // Handle new alert callback
+  const handleNewAlert = useCallback((newAlert: Alert) => {
+    setAlerts(prevAlerts => {
+      // Check if alert already exists to prevent duplicates
+      if (prevAlerts.some(alert => alert.id === newAlert.id)) {
+        return prevAlerts;
+      }
+      
+      // Add new alert and sort by creation date
+      const updatedAlerts = [newAlert, ...prevAlerts]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      // Show toast notification for new alert
+      toast.info(`New ${newAlert.source === 'user-reported' ? 'User Report' : 'Alert'}: ${newAlert.title}`, {
+        description: newAlert.description.substring(0, 50) + (newAlert.description.length > 50 ? '...' : ''),
+        action: {
+          label: 'View',
+          onClick: () => navigate(`/app/alerts/${newAlert.id}`),
+        },
       });
-    };
-    
-    useSubscribeToAlerts(handleNewAlert);
+      
+      return updatedAlerts;
+    });
   }, [navigate]);
+  
+  // Subscribe to new alerts using the hook properly
+  useSubscribeToAlerts(handleNewAlert);
 
   // Apply filters
   useEffect(() => {

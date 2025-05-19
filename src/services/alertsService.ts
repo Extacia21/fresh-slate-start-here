@@ -88,25 +88,32 @@ export const useGetAlertById = (id: string | undefined) => {
   });
 };
 
+// Separate subscription function from hook
+export const subscribeToAlerts = (callback: (alert: Alert) => void) => {
+  const handleReportCreated = (event: any) => {
+    if (event.detail && event.detail.type === 'new-report') {
+      // Convert report to alert format
+      const alert: Alert = {
+        ...event.detail.report,
+        severity: event.detail.report.severity || "medium",
+        source: event.detail.report.user_id ? "user-reported" : "official"
+      };
+      callback(alert);
+    }
+  };
+
+  window.addEventListener('report-created', handleReportCreated);
+  
+  // Return cleanup function
+  return () => {
+    window.removeEventListener('report-created', handleReportCreated);
+  };
+};
+
+// Hook that uses the subscribe function
 export const useSubscribeToAlerts = (callback: (alert: Alert) => void) => {
-  // Since reports are our alerts, we'll subscribe to report creation events
   useEffect(() => {
-    const handleReportCreated = (event: any) => {
-      if (event.detail && event.detail.type === 'new-report') {
-        // Convert report to alert format
-        const alert: Alert = {
-          ...event.detail.report,
-          severity: event.detail.report.severity || "medium",
-          source: event.detail.report.user_id ? "user-reported" : "official"
-        };
-        callback(alert);
-      }
-    };
-
-    window.addEventListener('report-created', handleReportCreated);
-
-    return () => {
-      window.removeEventListener('report-created', handleReportCreated);
-    };
+    const unsubscribe = subscribeToAlerts(callback);
+    return unsubscribe;
   }, [callback]);
 };
