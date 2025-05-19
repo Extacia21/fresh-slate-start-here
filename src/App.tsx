@@ -48,36 +48,38 @@ function App() {
       <ThemeProvider>
         <TooltipProvider>
           <Router>
-            <Routes>
-              {/* Public routes */}
-              <Route path="/" element={<SplashScreen />} />
-              <Route path="/onboarding" element={<Onboarding />} />
-              <Route path="/signin" element={<SignIn />} />
-              <Route path="/signup" element={<SignUp />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              
-              {/* Protected routes */}
-              <Route path="/app" element={<MainLayoutAuthWrapper />}>
-                <Route index element={<Home />} />
-                <Route path="alerts" element={<Alerts />} />
-                <Route path="alerts/:id" element={<AlertDetail />} />
-                <Route path="resources" element={<Resources />} />
-                <Route path="resources/:id" element={<ResourceDetail />} />
-                <Route path="resources/saved" element={<SavedResources />} />
-                <Route path="contacts" element={<Contacts />} />
-                <Route path="profile" element={<Profile />} />
-                <Route path="profile/personal" element={<PersonalInfo />} />
-                <Route path="profile/emergency" element={<EmergencyContacts />} />
-                <Route path="profile/medical" element={<MedicalInfo />} />
-                <Route path="settings" element={<Settings />} />
-                <Route path="chat" element={<Chat />} />
-                <Route path="nearby" element={<Nearby />} />
-                <Route path="report" element={<ReportIncident />} />
-              </Route>
-              
-              {/* 404 route */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <AuthProvider>
+              <Routes>
+                {/* Public routes */}
+                <Route path="/" element={<SplashScreen />} />
+                <Route path="/onboarding" element={<Onboarding />} />
+                <Route path="/signin" element={<SignIn />} />
+                <Route path="/signup" element={<SignUp />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                
+                {/* Protected routes */}
+                <Route path="/app" element={<MainLayoutAuthWrapper />}>
+                  <Route index element={<Home />} />
+                  <Route path="alerts" element={<Alerts />} />
+                  <Route path="alerts/:id" element={<AlertDetail />} />
+                  <Route path="resources" element={<Resources />} />
+                  <Route path="resources/:id" element={<ResourceDetail />} />
+                  <Route path="resources/saved" element={<SavedResources />} />
+                  <Route path="contacts" element={<Contacts />} />
+                  <Route path="profile" element={<Profile />} />
+                  <Route path="profile/personal" element={<PersonalInfo />} />
+                  <Route path="profile/emergency" element={<EmergencyContacts />} />
+                  <Route path="profile/medical" element={<MedicalInfo />} />
+                  <Route path="settings" element={<Settings />} />
+                  <Route path="chat" element={<Chat />} />
+                  <Route path="nearby" element={<Nearby />} />
+                  <Route path="report" element={<ReportIncident />} />
+                </Route>
+                
+                {/* 404 route */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </AuthProvider>
           </Router>
           <Toaster />
           <Sonner />

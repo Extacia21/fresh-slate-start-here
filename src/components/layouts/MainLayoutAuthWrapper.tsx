@@ -2,7 +2,6 @@
 import { Outlet } from 'react-router-dom';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import MainLayout from './MainLayout';
-import { AuthProvider } from '@/contexts/AuthContext';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -36,13 +35,11 @@ const MainLayoutAuthWrapper = () => {
   }, [hasShownWelcomeToast]);
   
   return (
-    <AuthProvider>
-      <ProtectedRoute redirectTo="/signin">
-        <MainLayout>
-          <Outlet />
-        </MainLayout>
-      </ProtectedRoute>
-    </AuthProvider>
+    <ProtectedRoute redirectTo="/signin">
+      <MainLayout>
+        <Outlet />
+      </MainLayout>
+    </ProtectedRoute>
   );
 };
 
