@@ -2,13 +2,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import type { Report } from "@/integrations/supabase/reports";
 import { getReports, getReportById } from "@/integrations/supabase/reports";
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { toast } from "sonner";
 
 // Since we don't have an alerts table, we'll use reports as alerts
 export interface Alert extends Report {
   severity: "critical" | "high" | "medium" | "low";
   source?: "official" | "user-reported" | string;
 }
+
+// Store alerts in memory to prevent losing them
+let alertsCache: Alert[] = [];
 
 // Color mapping for alert types
 export const alertTypeColors = {
@@ -45,7 +49,9 @@ export const alertTypeColors = {
 };
 
 export const useGetAlerts = () => {
-  return useQuery({
+  const [localAlerts, setLocalAlerts] = useState<Alert[]>(alertsCache);
+
+  const { data, isLoading, error } = useQuery({
     queryKey: ['alerts'],
     queryFn: async () => {
       // Get alerts (using reports as mock)
@@ -60,16 +66,65 @@ export const useGetAlerts = () => {
         ...report,
         severity: report.severity || "medium",
         source: report.user_id ? "user-reported" : "official"
-      }));
-        
-      return alerts as Alert[];
+      })) as Alert[];
+
+      // Update our cache
+      alertsCache = alerts;
+      
+      return alerts;
     },
+    refetchInterval: 15000, // Refetch every 15 seconds to keep data fresh
   });
+
+  // Update local state when data changes
+  useEffect(() => {
+    if (data) {
+      setLocalAlerts(data);
+    }
+  }, [data]);
+
+  // Handle new alert subscription
+  useEffect(() => {
+    const handleNewAlert = (event: CustomEvent) => {
+      if (event.detail && event.detail.type === 'new-report') {
+        const newAlert: Alert = {
+          ...event.detail.report,
+          severity: event.detail.report.severity || "medium",
+          source: event.detail.report.user_id ? "user-reported" : "official"
+        };
+        
+        // Update local state with new alert at the top
+        setLocalAlerts(prev => {
+          // Check if already exists to prevent duplicates
+          if (prev.some(a => a.id === newAlert.id)) {
+            return prev;
+          }
+          const newAlerts = [newAlert, ...prev];
+          alertsCache = newAlerts; // Update cache
+          return newAlerts;
+        });
+      }
+    };
+
+    window.addEventListener('report-created', handleNewAlert as EventListener);
+    
+    return () => {
+      window.removeEventListener('report-created', handleNewAlert as EventListener);
+    };
+  }, []);
+
+  return {
+    data: localAlerts,
+    isLoading,
+    error,
+  };
 };
 
 export const useGetRecentAlerts = (limit = 10) => {
-  return useQuery({
-    queryKey: ['alerts', limit],
+  const [localAlerts, setLocalAlerts] = useState<Alert[]>([]);
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['recent-alerts', limit],
     queryFn: async () => {
       // Get alerts (using reports as mock)
       const { data, error } = await getReports();
@@ -90,12 +145,66 @@ export const useGetRecentAlerts = (limit = 10) => {
         
       return alerts as Alert[];
     },
-    refetchInterval: 30000, // Refetch every 30 seconds for simulation
+    refetchInterval: 15000, // Refetch every 15 seconds for simulation
   });
+
+  // Update local state when data changes
+  useEffect(() => {
+    if (data) {
+      setLocalAlerts(data);
+    }
+  }, [data]);
+
+  // Handle new alert subscription
+  useEffect(() => {
+    const handleNewAlert = (event: CustomEvent) => {
+      if (event.detail && event.detail.type === 'new-report') {
+        const newAlert: Alert = {
+          ...event.detail.report,
+          severity: event.detail.report.severity || "medium",
+          source: event.detail.report.user_id ? "user-reported" : "official"
+        };
+        
+        // Add new alert to local state at the top
+        setLocalAlerts(prev => {
+          // Check if already exists to prevent duplicates
+          if (prev.some(a => a.id === newAlert.id)) {
+            return prev;
+          }
+          
+          // Keep the array limited to the specified limit
+          const newAlerts = [newAlert, ...prev];
+          if (newAlerts.length > limit) {
+            return newAlerts.slice(0, limit);
+          }
+          return newAlerts;
+        });
+
+        // Show toast notification for new alert
+        toast.info(`New Alert: ${newAlert.title}`, {
+          description: newAlert.description.substring(0, 50) + (newAlert.description.length > 50 ? '...' : ''),
+        });
+      }
+    };
+
+    window.addEventListener('report-created', handleNewAlert as EventListener);
+    
+    return () => {
+      window.removeEventListener('report-created', handleNewAlert as EventListener);
+    };
+  }, [limit]);
+
+  return {
+    data: localAlerts,
+    isLoading,
+    error,
+  };
 };
 
 export const useGetAlertById = (id: string | undefined) => {
-  return useQuery({
+  const [localAlert, setLocalAlert] = useState<Alert | null>(null);
+
+  const { data, isLoading, error } = useQuery({
     queryKey: ['alert', id],
     queryFn: async () => {
       if (!id) return null;
@@ -119,6 +228,45 @@ export const useGetAlertById = (id: string | undefined) => {
     },
     enabled: !!id,
   });
+
+  // Update local state when data changes
+  useEffect(() => {
+    if (data) {
+      setLocalAlert(data);
+    }
+  }, [data]);
+
+  // Handle alert updates
+  useEffect(() => {
+    const handleAlertUpdate = (event: CustomEvent) => {
+      if (event.detail && 
+          event.detail.type === 'update-report' && 
+          event.detail.report.id === id) {
+        setLocalAlert(prevAlert => {
+          if (!prevAlert) return null;
+          return {
+            ...prevAlert,
+            ...event.detail.report,
+            // Preserve alert-specific fields
+            severity: event.detail.report.severity || prevAlert.severity,
+            source: event.detail.report.source || prevAlert.source
+          };
+        });
+      }
+    };
+
+    window.addEventListener('report-updated', handleAlertUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('report-updated', handleAlertUpdate as EventListener);
+    };
+  }, [id]);
+
+  return {
+    data: localAlert || data,
+    isLoading,
+    error,
+  };
 };
 
 // Separate subscription function from hook

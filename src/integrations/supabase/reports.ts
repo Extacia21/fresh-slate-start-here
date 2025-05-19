@@ -67,6 +67,20 @@ const mockEmergencies = [
   }
 ];
 
+// Array of update messages for simulating live updates
+const updateMessages = [
+  'Emergency crews are now on site.',
+  'Additional resources have been deployed to the affected area.',
+  'Authorities are advising residents to avoid the area.',
+  'The situation is being monitored closely by emergency services.',
+  'Road closures have been implemented around the affected area.',
+  'Evacuation orders have been issued for nearby residents.',
+  'Medical teams are on standby to provide assistance.',
+  'Weather conditions are deteriorating in the affected region.',
+  'Officials have scheduled a press conference to provide more details.',
+  'Community shelters have been opened for displaced residents.'
+];
+
 // Function to generate a random emergency report
 function generateRandomReport(): Report {
   const randomType = mockEmergencies[Math.floor(Math.random() * mockEmergencies.length)];
@@ -79,6 +93,19 @@ function generateRandomReport(): Report {
   // Create timestamp between 1 minute and 3 hours ago
   const minutesAgo = Math.floor(Math.random() * 180) + 1;
   const timestamp = new Date(Date.now() - (minutesAgo * 60 * 1000)).toISOString();
+  
+  // Generate random updates (0-3)
+  const numUpdates = Math.floor(Math.random() * 3);
+  const updates: { time: string; content: string }[] = [];
+  
+  for (let i = 0; i < numUpdates; i++) {
+    const updateMinutesAgo = Math.floor(Math.random() * (minutesAgo - 1));
+    const updateTime = new Date(Date.now() - (updateMinutesAgo * 60 * 1000));
+    updates.push({
+      time: updateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      content: updateMessages[Math.floor(Math.random() * updateMessages.length)]
+    });
+  }
   
   return {
     id: `report-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -94,7 +121,7 @@ function generateRandomReport(): Report {
     is_public: true,
     type: randomType.type,
     source: 'official',
-    updates: []
+    updates: updates
   };
 }
 
@@ -114,7 +141,12 @@ let mockReports: Report[] = [
     is_public: true,
     type: 'weather',
     source: 'official',
-    updates: []
+    updates: [
+      { 
+        time: new Date(Date.now() - 7 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
+        content: 'Water levels continue to rise in downtown area. Additional streets being closed.' 
+      }
+    ]
   },
   {
     id: '2',
@@ -130,7 +162,16 @@ let mockReports: Report[] = [
     is_public: true,
     type: 'police',
     source: 'official',
-    updates: []
+    updates: [
+      { 
+        time: new Date(Date.now() - 30 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
+        content: 'Emergency crews are working to clear the accident. Detours in place.' 
+      },
+      { 
+        time: new Date(Date.now() - 15 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
+        content: 'One lane reopened. Cleanup continues.' 
+      }
+    ]
   },
   {
     id: '3',
@@ -146,19 +187,70 @@ let mockReports: Report[] = [
     is_public: true,
     type: 'other',
     source: 'official',
-    updates: []
+    updates: [
+      { 
+        time: new Date(Date.now() - 90 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
+        content: 'Utility company estimates 3-4 hours for service restoration.' 
+      }
+    ]
   }
 ];
 
-// Generate a new random alert every 30-90 seconds
+// Function to simulate updates to existing reports
+function simulateReportUpdates() {
+  // Only update reports that are active and have been around for a while
+  const eligibleReports = mockReports.filter(r => 
+    r.status === 'active' && 
+    new Date(r.updated_at).getTime() < Date.now() - 5 * 60 * 1000 // At least 5 minutes old
+  );
+  
+  if (eligibleReports.length > 0) {
+    // Pick a random report to update
+    const reportIndex = Math.floor(Math.random() * eligibleReports.length);
+    const reportToUpdate = eligibleReports[reportIndex];
+    
+    // Add a new update
+    const updateMessage = updateMessages[Math.floor(Math.random() * updateMessages.length)];
+    const newUpdate = {
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      content: updateMessage
+    };
+    
+    // Update the report
+    const updatedReport = {
+      ...reportToUpdate,
+      updates: [...(reportToUpdate.updates || []), newUpdate],
+      updated_at: new Date().toISOString()
+    };
+    
+    // Replace the report in the array
+    const reportIdx = mockReports.findIndex(r => r.id === reportToUpdate.id);
+    if (reportIdx !== -1) {
+      mockReports[reportIdx] = updatedReport;
+      
+      // Dispatch custom event for report update
+      if (typeof window !== 'undefined') {
+        const updateEvent = new CustomEvent('report-updated', {
+          detail: {
+            type: 'update-report',
+            report: updatedReport,
+          },
+        });
+        window.dispatchEvent(updateEvent);
+      }
+    }
+  }
+}
+
+// Generate a new random alert every 30-60 seconds
 if (typeof window !== 'undefined') {
   const generateAndAddReport = () => {
     const newReport = generateRandomReport();
     mockReports.unshift(newReport);
     
     // Keep the list at a reasonable size
-    if (mockReports.length > 20) {
-      mockReports.pop();
+    if (mockReports.length > 30) {
+      mockReports = mockReports.slice(0, 30);
     }
     
     // Dispatch custom event for real-time updates
@@ -171,12 +263,23 @@ if (typeof window !== 'undefined') {
     window.dispatchEvent(reportEvent);
     
     // Schedule next alert
-    const nextDelay = Math.floor(Math.random() * 60000) + 30000; // Between 30s and 90s
+    const nextDelay = Math.floor(Math.random() * 30000) + 30000; // Between 30s and 60s
     setTimeout(generateAndAddReport, nextDelay);
   };
   
+  // Schedule updates to existing reports every 15-45 seconds
+  const scheduleReportUpdates = () => {
+    simulateReportUpdates();
+    
+    const nextUpdateDelay = Math.floor(Math.random() * 30000) + 15000; // Between 15s and 45s
+    setTimeout(scheduleReportUpdates, nextUpdateDelay);
+  };
+  
   // Initial delay before starting simulation
-  setTimeout(generateAndAddReport, 5000);
+  setTimeout(() => {
+    generateAndAddReport();
+    scheduleReportUpdates();
+  }, 3000);
 }
 
 // Mock functions to handle reports
@@ -206,11 +309,23 @@ export const createReport = async (report: Omit<Report, 'id' | 'created_at' | 'u
       id: `report-${Date.now()}`,
       created_at: timestamp,
       updated_at: timestamp,
+      status: 'active',
       updates: []
     };
     
     // Add to our mock reports
     mockReports.unshift(newReport);
+    
+    // Dispatch custom event for real-time updates
+    if (typeof window !== 'undefined') {
+      const reportEvent = new CustomEvent('report-created', {
+        detail: {
+          type: 'new-report',
+          report: newReport,
+        },
+      });
+      window.dispatchEvent(reportEvent);
+    }
     
     return { data: newReport, error: null };
   } catch (error) {

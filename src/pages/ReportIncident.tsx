@@ -27,6 +27,11 @@ const ReportIncident = () => {
   const [longitude, setLongitude] = useState<number | null>(null);
   const [severity, setSeverity] = useState<"critical" | "high" | "medium" | "low">("medium");
   
+  // Get current location on component mount
+  useEffect(() => {
+    getCurrentLocation();
+  }, []); // Empty dependency array means this runs once on mount
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -35,25 +40,31 @@ const ReportIncident = () => {
       return;
     }
     
-    if (!title || !location || !description) {
+    if (!title || !description) {
       toast.error("Please fill in all required fields");
       return;
+    }
+    
+    if (!location) {
+      setLocation("Unknown location");
     }
     
     setIsSubmitting(true);
     
     try {
-      await createReportMutation.mutateAsync({
+      const reportData = {
         title,
         description,
         category: incidentType,
         type: incidentType,
-        location,
+        location: location || "Unknown location",
         latitude: latitude || undefined,
         longitude: longitude || undefined,
         is_public: true,
         severity: severity
-      });
+      };
+      
+      await createReportMutation.mutateAsync(reportData);
       
       toast.success("Report submitted successfully", {
         description: "Thank you for your report. Authorities have been notified."
@@ -73,6 +84,11 @@ const ReportIncident = () => {
         (position) => {
           setLatitude(position.coords.latitude);
           setLongitude(position.coords.longitude);
+          setLocation("Current Location");
+          setUseCurrentLocation(true);
+          toast.info("Using your current location", {
+            description: "Your location has been automatically detected",
+          });
         },
         (error) => {
           console.error("Error getting location:", error);
@@ -195,7 +211,7 @@ const ReportIncident = () => {
             <div className="flex justify-between items-center">
               <Label>Location</Label>
               <div className="flex items-center space-x-2">
-                <span className="text-xs">Use my location</span>
+                <span className="text-xs">{useCurrentLocation ? 'Using current location' : 'Enter manually'}</span>
                 <button 
                   type="button"
                   className={`relative h-5 w-10 rounded-full transition-colors
@@ -218,6 +234,10 @@ const ReportIncident = () => {
             {useCurrentLocation ? (
               <div className="rounded-md border overflow-hidden">
                 <LocationMap location="Current Location" />
+                <div className="p-2 bg-muted/30 text-center text-sm text-muted-foreground">
+                  <MapPin className="h-3 w-3 inline mr-1" />
+                  Using your current location
+                </div>
               </div>
             ) : (
               <div className="space-y-2">

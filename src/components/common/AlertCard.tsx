@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Bell, AlertTriangle, Info, CloudRain, CloudLightning, MapPin, Clock, Shield } from "lucide-react";
 import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,26 @@ const AlertCard = ({
   onClick 
 }: AlertCardProps) => {
   const navigate = useNavigate();
+  const [displayTime, setDisplayTime] = useState(time);
+  
+  // Update the time display periodically if it's a relative time
+  useEffect(() => {
+    // Check if time is a timestamp
+    if (time.includes('T') || time.includes('-')) {
+      // Set initial formatted time
+      setDisplayTime(formatRelativeTime(time));
+      
+      // Update time every minute
+      const interval = setInterval(() => {
+        setDisplayTime(formatRelativeTime(time));
+      }, 60000); // Update every minute
+      
+      return () => clearInterval(interval);
+    } else {
+      // If it's not a timestamp, just use the provided string
+      setDisplayTime(time);
+    }
+  }, [time]);
   
   // Get type color or default to 'other'
   const typeKey = (category || 'other') as keyof typeof alertTypeColors;
@@ -70,9 +90,6 @@ const AlertCard = ({
     }
   };
 
-  // Format time as relative if it's a timestamp
-  const formattedTime = time.includes('T') ? formatRelativeTime(time) : time;
-
   return (
     <div 
       className={cn(
@@ -101,7 +118,7 @@ const AlertCard = ({
           <div className="flex items-center justify-between text-xs opacity-70">
             <span className="flex items-center">
               <Clock className="h-3 w-3 mr-1" />
-              {formattedTime}
+              {displayTime}
             </span>
             {location && (
               <span className="flex items-center">

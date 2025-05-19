@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Sheet, 
   SheetContent, 
@@ -35,6 +34,12 @@ const ReportForm = ({ children }: ReportFormProps) => {
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [severity, setSeverity] = useState<"critical" | "high" | "medium" | "low">("medium");
+  const [useCurrentLocation, setUseCurrentLocation] = useState(true);
+
+  // Get current location on component mount
+  useEffect(() => {
+    handleUseCurrentLocation();
+  }, []); // Empty dependency array means this runs once on mount
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -44,25 +49,31 @@ const ReportForm = ({ children }: ReportFormProps) => {
       return;
     }
     
-    if (!incidentType || !title || !location || !description) {
+    if (!incidentType || !title || !description) {
       toast.error("Please fill in all required fields");
       return;
+    }
+    
+    if (!location) {
+      setLocation("Unknown location");
     }
     
     setIsSubmitting(true);
     
     try {
-      await createReportMutation.mutateAsync({
+      const reportData = {
         title,
         description,
         category: incidentType,
         type: incidentType,
-        location,
+        location: location || "Unknown location",
         latitude: latitude || undefined,
         longitude: longitude || undefined,
         is_public: true,
         severity: severity
-      });
+      };
+      
+      await createReportMutation.mutateAsync(reportData);
       
       toast.success("Report submitted successfully", {
         description: "Thank you for your report. Authorities have been notified."
@@ -76,6 +87,9 @@ const ReportForm = ({ children }: ReportFormProps) => {
       setLatitude(null);
       setLongitude(null);
       setSeverity("medium");
+      
+      // Get current location again for next report
+      handleUseCurrentLocation();
     } catch (error) {
       toast.error("Failed to submit report", {
         description: error instanceof Error ? error.message : "An unknown error occurred"
@@ -92,15 +106,18 @@ const ReportForm = ({ children }: ReportFormProps) => {
           setLatitude(position.coords.latitude);
           setLongitude(position.coords.longitude);
           setLocation("Current location");
+          setUseCurrentLocation(true);
           toast.info("Using your current location");
         },
         (error) => {
           console.error("Error getting location:", error);
           toast.error("Could not get your location. Please enter it manually.");
+          setUseCurrentLocation(false);
         }
       );
     } else {
       toast.error("Geolocation is not supported by your browser");
+      setUseCurrentLocation(false);
     }
   };
 
@@ -171,23 +188,33 @@ const ReportForm = ({ children }: ReportFormProps) => {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="location">Location</Label>
-              <Button 
-                type="button" 
-                variant="ghost" 
-                size="sm" 
-                className="text-xs flex items-center"
-                onClick={handleUseCurrentLocation}
-              >
-                <MapPin className="h-3 w-3 mr-1" />
-                Use my location
-              </Button>
+              <div className="flex items-center">
+                <span className="text-xs mr-2">{useCurrentLocation ? 'Using current location' : 'Enter manually'}</span>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-xs flex items-center"
+                  onClick={handleUseCurrentLocation}
+                >
+                  <MapPin className="h-3 w-3 mr-1" />
+                  {useCurrentLocation ? 'Refresh location' : 'Use my location'}
+                </Button>
+              </div>
             </div>
             <Input 
               id="location" 
               placeholder="Enter location" 
               value={location}
-              onChange={(e) => setLocation(e.target.value)}
+              onChange={(e) => {
+                setLocation(e.target.value);
+                if (e.target.value !== "Current location") {
+                  setUseCurrentLocation(false);
+                }
+              }}
               required
+              readOnly={useCurrentLocation}
+              className={useCurrentLocation ? "bg-muted" : ""}
             />
           </div>
           
