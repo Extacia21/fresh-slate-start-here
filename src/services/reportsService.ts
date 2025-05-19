@@ -2,9 +2,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import { Report } from "@/integrations/supabase/reports";
+import type { Report } from "@/integrations/supabase/reports";
 
-export { Report };
+export type { Report };
 
 // Simulate fetch for reports
 const fetchReports = async () => {
