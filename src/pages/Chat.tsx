@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Send, ArrowLeft, MoreVertical, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -25,18 +26,17 @@ const Chat = () => {
   const { data: messagesData, isLoading } = useGetMessages(chatRoomId);
   const sendMessageMutation = useSendMessage();
 
-  // Subscribe to new messages
-  useEffect(() => {
-    const handleNewMessage = (newMessage: Message) => {
-      // Only add if it's not from the current user to avoid duplicates
-      // (since we're optimistically adding sent messages)
-      if (newMessage.sender_id !== user?.id) {
-        setMessages(prevMessages => [...prevMessages, newMessage]);
-      }
-    };
-    
-    useSubscribeToMessages(chatRoomId, handleNewMessage);
-  }, [chatRoomId, user]);
+  // Handle new message callback
+  const handleNewMessage = useCallback((newMessage: Message) => {
+    // Only add if it's not from the current user to avoid duplicates
+    // (since we're optimistically adding sent messages)
+    if (newMessage.sender_id !== user?.id) {
+      setMessages(prevMessages => [...prevMessages, newMessage]);
+    }
+  }, [user]);
+
+  // Subscribe to new messages using the fixed hook
+  useSubscribeToMessages(chatRoomId, handleNewMessage);
 
   // Set messages when loaded from Supabase
   useEffect(() => {

@@ -2,6 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Message, getMessages, sendMessage } from "@/integrations/supabase/messages";
+import { useEffect } from 'react';
 
 export type { Message };
 
@@ -56,7 +57,8 @@ export const useSendMessage = () => {
   });
 };
 
-export const useSubscribeToMessages = (
+// Separate subscription function from hook
+export const subscribeToMessages = (
   chatRoomId: string | undefined,
   callback: (message: Message) => void
 ) => {
@@ -68,16 +70,21 @@ export const useSubscribeToMessages = (
   };
   
   // Set up subscription
-  useEffect(() => {
-    // Cast to any since we're using a custom event type
-    window.addEventListener('message-event', handleMessageEvent as any);
-    
-    // Return cleanup function
-    return () => {
-      window.removeEventListener('message-event', handleMessageEvent as any);
-    };
-  }, [chatRoomId, callback]);
+  window.addEventListener('message-event', handleMessageEvent as any);
+  
+  // Return cleanup function
+  return () => {
+    window.removeEventListener('message-event', handleMessageEvent as any);
+  };
 };
 
-// Missing import
-import { useEffect } from 'react';
+// Proper hook that uses the subscribe function
+export const useSubscribeToMessages = (
+  chatRoomId: string | undefined,
+  callback: (message: Message) => void
+) => {
+  useEffect(() => {
+    const unsubscribe = subscribeToMessages(chatRoomId, callback);
+    return unsubscribe;
+  }, [chatRoomId, callback]);
+};
