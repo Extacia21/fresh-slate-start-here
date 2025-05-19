@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfileData } from "@/hooks/use-profile-data";
-import { useGetRecentAlerts, useSubscribeToAlerts } from "@/services/alertsService";
+import { useGetRecentAlerts, useSubscribeToAlerts, Alert } from "@/services/alertsService";
 
 const Home = () => {
   const { user } = useAuth();
@@ -44,7 +44,7 @@ const Home = () => {
 
   // Subscribe to new alerts
   useEffect(() => {
-    const unsubscribe = useSubscribeToAlerts((newAlert) => {
+    const handleNewAlert = (newAlert: Alert) => {
       setRecentAlerts(prev => [newAlert, ...prev.slice(0, 4)]);
       
       toast({
@@ -52,11 +52,9 @@ const Home = () => {
         description: newAlert.title,
         duration: 5000,
       });
-    });
-    
-    return () => {
-      unsubscribe();
     };
+    
+    useSubscribeToAlerts(handleNewAlert);
   }, []);
 
   // Mock user location for sharing

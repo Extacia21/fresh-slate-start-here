@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Send, ArrowLeft, MoreVertical, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,17 +27,15 @@ const Chat = () => {
 
   // Subscribe to new messages
   useEffect(() => {
-    const unsubscribe = useSubscribeToMessages(chatRoomId, (newMessage) => {
+    const handleNewMessage = (newMessage: Message) => {
       // Only add if it's not from the current user to avoid duplicates
       // (since we're optimistically adding sent messages)
       if (newMessage.sender_id !== user?.id) {
         setMessages(prevMessages => [...prevMessages, newMessage]);
       }
-    });
-    
-    return () => {
-      unsubscribe();
     };
+    
+    useSubscribeToMessages(chatRoomId, handleNewMessage);
   }, [chatRoomId, user]);
 
   // Set messages when loaded from Supabase

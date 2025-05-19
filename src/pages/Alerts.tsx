@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Bell, Filter } from "lucide-react";
 import AlertCard from "@/components/common/AlertCard";
@@ -25,7 +24,7 @@ const Alerts = () => {
 
   // Subscribe to new alerts
   useEffect(() => {
-    const unsubscribe = useSubscribeToAlerts((newAlert) => {
+    const handleNewAlert = (newAlert: Alert) => {
       setAlerts(prevAlerts => {
         // Check if alert already exists to prevent duplicates
         if (prevAlerts.some(alert => alert.id === newAlert.id)) {
@@ -47,11 +46,9 @@ const Alerts = () => {
         
         return updatedAlerts;
       });
-    });
-    
-    return () => {
-      unsubscribe();
     };
+    
+    useSubscribeToAlerts(handleNewAlert);
   }, [navigate]);
 
   // Apply filters

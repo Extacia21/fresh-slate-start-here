@@ -34,6 +34,7 @@ const ReportForm = ({ children }: ReportFormProps) => {
   const [description, setDescription] = useState("");
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
+  const [severity, setSeverity] = useState<"critical" | "high" | "medium" | "low">("medium");
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -58,7 +59,8 @@ const ReportForm = ({ children }: ReportFormProps) => {
         location,
         latitude: latitude || undefined,
         longitude: longitude || undefined,
-        is_public: true
+        is_public: true,
+        severity: severity
       });
       
       toast.success("Report submitted successfully", {
@@ -72,6 +74,7 @@ const ReportForm = ({ children }: ReportFormProps) => {
       setDescription("");
       setLatitude(null);
       setLongitude(null);
+      setSeverity("medium");
     } catch (error) {
       toast.error("Failed to submit report", {
         description: error instanceof Error ? error.message : "An unknown error occurred"
@@ -131,6 +134,25 @@ const ReportForm = ({ children }: ReportFormProps) => {
                 <SelectItem value="weather">Weather Emergency</SelectItem>
                 <SelectItem value="traffic">Traffic Incident</SelectItem>
                 <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="severity">Severity</Label>
+            <Select 
+              value={severity} 
+              onValueChange={(value: "critical" | "high" | "medium" | "low") => setSeverity(value)}
+              required
+            >
+              <SelectTrigger id="severity">
+                <SelectValue placeholder="Select severity" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="critical">Critical</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
               </SelectContent>
             </Select>
           </div>

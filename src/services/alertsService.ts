@@ -3,11 +3,36 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import type { Report } from "@/integrations/supabase/reports";
 import { getReports } from "@/integrations/supabase/reports";
+import { useEffect } from 'react';
 
 // Since we don't have an alerts table, we'll use reports as alerts
 export interface Alert extends Report {
   severity: "critical" | "high" | "medium" | "low";
+  source?: "official" | "user-reported" | string;
 }
+
+export const useGetAlerts = () => {
+  return useQuery({
+    queryKey: ['alerts'],
+    queryFn: async () => {
+      // Get alerts (using reports as mock)
+      const { data, error } = await getReports();
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      // Convert reports to alerts
+      const alerts = data?.map(report => ({
+        ...report,
+        severity: report.severity || "medium",
+        source: report.user_id ? "user-reported" : "official"
+      }));
+        
+      return alerts as Alert[];
+    },
+  });
+};
 
 export const useGetRecentAlerts = (limit = 10) => {
   return useQuery({
@@ -26,7 +51,8 @@ export const useGetRecentAlerts = (limit = 10) => {
         .slice(0, limit)
         .map(report => ({
           ...report,
-          severity: report.severity || "medium"
+          severity: report.severity || "medium",
+          source: report.user_id ? "user-reported" : "official"
         }));
         
       return alerts as Alert[];
@@ -52,7 +78,11 @@ export const useGetAlertById = (id: string | undefined) => {
         throw new Error("Alert not found");
       }
       
-      return alert as Alert;
+      return {
+        ...alert,
+        severity: alert.severity || "medium",
+        source: alert.user_id ? "user-reported" : "official"
+      } as Alert;
     },
     enabled: !!id,
   });
@@ -60,18 +90,19 @@ export const useGetAlertById = (id: string | undefined) => {
 
 export const useSubscribeToAlerts = (callback: (alert: Alert) => void) => {
   // Since reports are our alerts, we'll subscribe to report creation events
-  const handleReportCreated = (event: any) => {
-    if (event.detail && event.detail.type === 'new-report') {
-      // Convert report to alert format
-      const alert: Alert = {
-        ...event.detail.report,
-        severity: event.detail.report.severity || "medium"
-      };
-      callback(alert);
-    }
-  };
-
   useEffect(() => {
+    const handleReportCreated = (event: any) => {
+      if (event.detail && event.detail.type === 'new-report') {
+        // Convert report to alert format
+        const alert: Alert = {
+          ...event.detail.report,
+          severity: event.detail.report.severity || "medium",
+          source: event.detail.report.user_id ? "user-reported" : "official"
+        };
+        callback(alert);
+      }
+    };
+
     window.addEventListener('report-created', handleReportCreated);
 
     return () => {
@@ -79,6 +110,3 @@ export const useSubscribeToAlerts = (callback: (alert: Alert) => void) => {
     };
   }, [callback]);
 };
-
-// Missing import
-import { useEffect } from 'react';

@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import LocationMap from "@/components/common/LocationMap";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateReport } from "@/services/reportsService";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -24,6 +25,7 @@ const ReportIncident = () => {
   const [description, setDescription] = useState("");
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
+  const [severity, setSeverity] = useState<"critical" | "high" | "medium" | "low">("medium");
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +50,8 @@ const ReportIncident = () => {
         location,
         latitude: latitude || undefined,
         longitude: longitude || undefined,
-        is_public: true
+        is_public: true,
+        severity: severity
       });
       
       toast.success("Report submitted successfully", {
@@ -83,11 +86,11 @@ const ReportIncident = () => {
   };
   
   // Get current location on component mount if using current location
-  useState(() => {
+  useEffect(() => {
     if (useCurrentLocation) {
       getCurrentLocation();
     }
-  });
+  }, [useCurrentLocation]);
   
   return (
     <div className="flex flex-col h-full">
@@ -143,6 +146,25 @@ const ReportIncident = () => {
                 <span className="text-sm">Other</span>
               </Label>
             </RadioGroup>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="severity">Severity</Label>
+            <Select 
+              value={severity} 
+              onValueChange={(value: "critical" | "high" | "medium" | "low") => setSeverity(value)}
+              required
+            >
+              <SelectTrigger id="severity">
+                <SelectValue placeholder="Select severity" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="critical">Critical</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           
           <div className="space-y-2">

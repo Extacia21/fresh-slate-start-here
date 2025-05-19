@@ -2,12 +2,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import type { Report, getReports, getPublicReports, createReport } from "@/integrations/supabase/reports";
+import { useEffect } from 'react';
+
+// Import actual functions instead of types
+import { getReports, getPublicReports, createReport, Report } from "@/integrations/supabase/reports";
 
 export type { Report };
-
-// Import mocked functions
-import { getReports, getPublicReports, createReport } from "@/integrations/supabase/reports";
 
 export const useGetReports = () => {
   return useQuery({
@@ -89,15 +89,13 @@ export const useCreateReport = () => {
 };
 
 export const useSubscribeToReports = (callback: (report: Report) => void) => {
-  // In a real app with Supabase, you'd use real-time subscriptions
-  // For now, we'll use a custom event listener
-  const handleReportCreated = (event: any) => {
-    if (event.detail && event.detail.type === 'new-report') {
-      callback(event.detail.report as Report);
-    }
-  };
-
   useEffect(() => {
+    const handleReportCreated = (event: any) => {
+      if (event.detail && event.detail.type === 'new-report') {
+        callback(event.detail.report as Report);
+      }
+    };
+
     window.addEventListener('report-created', handleReportCreated);
 
     return () => {
@@ -105,6 +103,3 @@ export const useSubscribeToReports = (callback: (report: Report) => void) => {
     };
   }, [callback]);
 };
-
-// Missing import
-import { useEffect } from 'react';
