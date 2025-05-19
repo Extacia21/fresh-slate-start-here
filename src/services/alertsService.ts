@@ -11,6 +11,40 @@ export interface Alert extends Report {
   source?: "official" | "user-reported" | string;
 }
 
+// Color mapping for alert types
+export const alertTypeColors = {
+  fire: {
+    bg: 'bg-red-100',
+    text: 'text-red-800',
+    icon: 'text-red-600',
+    border: 'border-red-200'
+  },
+  police: {
+    bg: 'bg-yellow-100',
+    text: 'text-yellow-800',
+    icon: 'text-yellow-600',
+    border: 'border-yellow-200'
+  },
+  health: {
+    bg: 'bg-green-100',
+    text: 'text-green-800',
+    icon: 'text-green-600',
+    border: 'border-green-200'
+  },
+  weather: {
+    bg: 'bg-blue-100',
+    text: 'text-blue-800',
+    icon: 'text-blue-600',
+    border: 'border-blue-200'
+  },
+  other: {
+    bg: 'bg-gray-100',
+    text: 'text-gray-800',
+    icon: 'text-gray-600',
+    border: 'border-gray-200'
+  }
+};
+
 export const useGetAlerts = () => {
   return useQuery({
     queryKey: ['alerts'],
@@ -57,6 +91,7 @@ export const useGetRecentAlerts = (limit = 10) => {
         
       return alerts as Alert[];
     },
+    refetchInterval: 30000, // Refetch every 30 seconds for simulation
   });
 };
 
@@ -116,4 +151,26 @@ export const useSubscribeToAlerts = (callback: (alert: Alert) => void) => {
     const unsubscribe = subscribeToAlerts(callback);
     return unsubscribe;
   }, [callback]);
+};
+
+// Format timestamp relative to current time
+export const formatRelativeTime = (timestamp: string): string => {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  
+  if (diffMins < 1) {
+    return "Just now";
+  } else if (diffMins < 60) {
+    return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`;
+  } else if (diffHours < 24) {
+    return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+  } else if (diffDays < 7) {
+    return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
+  } else {
+    return date.toLocaleDateString();
+  }
 };

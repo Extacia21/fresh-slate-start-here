@@ -1,6 +1,6 @@
 
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, AlertTriangle, Camera, MapPin, AlertCircle } from "lucide-react";
+import { ArrowLeft, AlertTriangle, MapPin, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,6 +47,7 @@ const ReportIncident = () => {
         title,
         description,
         category: incidentType,
+        type: incidentType,
         location,
         latitude: latitude || undefined,
         longitude: longitude || undefined,
@@ -127,23 +128,23 @@ const ReportIncident = () => {
             >
               <Label htmlFor="weather" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary">
                 <RadioGroupItem value="weather" id="weather" className="sr-only" />
-                <AlertCircle className="mb-3 h-6 w-6" />
+                <AlertCircle className="mb-3 h-6 w-6 text-blue-600" />
                 <span className="text-sm">Weather Emergency</span>
               </Label>
               <Label htmlFor="fire" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary">
                 <RadioGroupItem value="fire" id="fire" className="sr-only" />
                 <span className="text-2xl mb-2">🔥</span>
-                <span className="text-sm">Fire</span>
+                <span className="text-sm text-red-600">Fire</span>
               </Label>
               <Label htmlFor="health" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary">
                 <RadioGroupItem value="health" id="health" className="sr-only" />
                 <span className="text-2xl mb-2">🏥</span>
-                <span className="text-sm">Medical</span>
+                <span className="text-sm text-green-600">Medical</span>
               </Label>
-              <Label htmlFor="other" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary">
-                <RadioGroupItem value="other" id="other" className="sr-only" />
-                <AlertTriangle className="mb-3 h-6 w-6" />
-                <span className="text-sm">Other</span>
+              <Label htmlFor="police" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary">
+                <RadioGroupItem value="police" id="police" className="sr-only" />
+                <span className="text-2xl mb-2">🚓</span>
+                <span className="text-sm text-yellow-600">Police</span>
               </Label>
             </RadioGroup>
           </div>
@@ -228,17 +229,6 @@ const ReportIncident = () => {
                 />
               </div>
             )}
-          </div>
-          
-          <div className="space-y-2">
-            <Label>Add Photos</Label>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="aspect-square border-2 border-dashed rounded-md flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors">
-                <Camera className="h-6 w-6 text-muted-foreground mb-1" />
-                <span className="text-xs text-muted-foreground">Add Photo</span>
-                <input type="file" className="hidden" accept="image/*" />
-              </div>
-            </div>
           </div>
           
           <div className="pt-6">

@@ -56,6 +56,7 @@ const ReportForm = ({ children }: ReportFormProps) => {
         title,
         description,
         category: incidentType,
+        type: incidentType,
         location,
         latitude: latitude || undefined,
         longitude: longitude || undefined,
@@ -132,7 +133,6 @@ const ReportForm = ({ children }: ReportFormProps) => {
                 <SelectItem value="police">Police</SelectItem>
                 <SelectItem value="health">Medical Emergency</SelectItem>
                 <SelectItem value="weather">Weather Emergency</SelectItem>
-                <SelectItem value="traffic">Traffic Incident</SelectItem>
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
@@ -202,25 +202,6 @@ const ReportForm = ({ children }: ReportFormProps) => {
               required
               className="resize-none"
             />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="photo">Add Photo (Optional)</Label>
-            <div className="border-2 border-dashed border-border rounded-md p-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                Click to upload or drag and drop
-              </p>
-              <input type="file" className="hidden" id="photo" />
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="sm" 
-                className="mt-2" 
-                onClick={() => document.getElementById("photo")?.click()}
-              >
-                Select File
-              </Button>
-            </div>
           </div>
           
           <SheetFooter className="flex flex-col sm:flex-row gap-2 pt-4 border-t">

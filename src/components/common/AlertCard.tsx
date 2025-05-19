@@ -1,9 +1,11 @@
 
 import React from "react";
-import { Bell, AlertTriangle, Info, CloudRain, CloudLightning, MapPin, Clock } from "lucide-react";
+import { Bell, AlertTriangle, Info, CloudRain, CloudLightning, MapPin, Clock, Shield } from "lucide-react";
 import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { alertTypeColors } from "@/services/alertsService";
+import { formatRelativeTime } from "@/services/alertsService";
 
 type AlertSeverity = "critical" | "high" | "medium" | "low";
 
@@ -32,43 +34,32 @@ const AlertCard = ({
 }: AlertCardProps) => {
   const navigate = useNavigate();
   
-  const alertClasses: Record<AlertSeverity, string> = {
-    critical: "alert-critical",
-    high: "alert-high",
-    medium: "alert-medium",
-    low: "alert-low",
-  };
-
+  // Get type color or default to 'other'
+  const typeKey = (category || 'other') as keyof typeof alertTypeColors;
+  const typeColor = alertTypeColors[typeKey] || alertTypeColors.other;
+  
   const severityIndicatorClasses: Record<AlertSeverity, string> = {
-    critical: "severity-critical",
-    high: "severity-high",
-    medium: "severity-medium",
-    low: "severity-low",
+    critical: "bg-red-600",
+    high: "bg-red-500",
+    medium: "bg-orange-500",
+    low: "bg-yellow-500",
   };
 
-  const getSeverityColor = (severity: AlertSeverity) => {
-    switch (severity) {
-      case "critical": return "bg-red-600";
-      case "high": return "bg-red-500";
-      case "medium": return "bg-orange-500";
-      case "low": return "bg-yellow-500";
-      default: return "bg-gray-500";
-    }
-  };
-
-  // Default icon based on category and severity if no specific icon is provided
+  // Default icon based on category
   const DefaultIcon = () => {
+    if (category === "fire") {
+      return <AlertTriangle size={18} className="text-red-600" />;
+    }
+    if (category === "police") {
+      return <Shield size={18} className="text-yellow-600" />;
+    }
+    if (category === "health") {
+      return <Info size={18} className="text-green-600" />;
+    }
     if (category === "weather") {
-      return severity === "critical" || severity === "high" 
-        ? <CloudLightning size={18} /> 
-        : <CloudRain size={18} />;
+      return <CloudRain size={18} className="text-blue-600" />;
     }
-    
-    if (severity === "critical" || severity === "high") {
-      return <AlertTriangle size={18} />;
-    }
-    
-    return <Info size={18} />;
+    return <Info size={18} className="text-gray-600" />;
   };
 
   const handleClick = () => {
@@ -79,17 +70,20 @@ const AlertCard = ({
     }
   };
 
+  // Format time as relative if it's a timestamp
+  const formattedTime = time.includes('T') ? formatRelativeTime(time) : time;
+
   return (
     <div 
       className={cn(
-        "relative p-3 border border-border rounded-lg mb-3 hover:bg-muted/30 cursor-pointer", 
-        alertClasses[severity]
+        "relative p-3 border rounded-lg mb-3 hover:bg-muted/30 cursor-pointer", 
+        typeColor.border
       )}
       onClick={handleClick}
     >
       <div className="flex items-start">
-        <div className={`p-2 rounded-full ${getSeverityColor(severity)} bg-opacity-20 mr-3`}>
-          {Icon ? <Icon size={18} /> : <DefaultIcon />}
+        <div className={`p-2 rounded-full ${typeColor.bg} mr-3`}>
+          {Icon ? <Icon size={18} className={typeColor.text} /> : <DefaultIcon />}
         </div>
         <div className="flex-1">
           <div className="flex items-center mb-1 justify-between">
@@ -98,7 +92,7 @@ const AlertCard = ({
               <h3 className="font-semibold">{title}</h3>
             </div>
             {category && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-muted capitalize">
+              <span className={`text-xs px-2 py-0.5 rounded-full ${typeColor.bg} ${typeColor.text} capitalize`}>
                 {category}
               </span>
             )}
@@ -107,7 +101,7 @@ const AlertCard = ({
           <div className="flex items-center justify-between text-xs opacity-70">
             <span className="flex items-center">
               <Clock className="h-3 w-3 mr-1" />
-              {time}
+              {formattedTime}
             </span>
             {location && (
               <span className="flex items-center">

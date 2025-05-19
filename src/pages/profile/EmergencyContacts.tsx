@@ -3,20 +3,27 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronRight, Plus, User, Phone, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface EmergencyContact {
+  id?: string;
+  user_id?: string;
   name: string;
   relationship: string;
   phone: string;
+  created_at?: string;
 }
 
 const EmergencyContacts = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [currentContact, setCurrentContact] = useState<EmergencyContact>({
     name: "",
     relationship: "",
@@ -25,19 +32,49 @@ const EmergencyContacts = () => {
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   useEffect(() => {
-    // Load contacts from localStorage
-    const savedProfile = localStorage.getItem("userProfile");
-    if (savedProfile) {
-      try {
-        const profile = JSON.parse(savedProfile);
-        if (profile.emergencyContacts) {
-          setContacts(profile.emergencyContacts);
-        }
-      } catch (e) {
-        console.error("Failed to load emergency contacts:", e);
-      }
+    if (user) {
+      fetchContacts();
     }
-  }, []);
+  }, [user]);
+
+  const fetchContacts = async () => {
+    if (!user) return;
+
+    setIsLoading(true);
+    try {
+      // First try to load from Supabase
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('type', 'emergency')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      setContacts(data || []);
+
+      // If no Supabase data, fallback to localStorage
+      if (!data || data.length === 0) {
+        const savedProfile = localStorage.getItem("userProfile");
+        if (savedProfile) {
+          try {
+            const profile = JSON.parse(savedProfile);
+            if (profile.emergencyContacts) {
+              setContacts(profile.emergencyContacts);
+            }
+          } catch (e) {
+            console.error("Failed to load emergency contacts from localStorage:", e);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load emergency contacts:", e);
+      toast.error("Failed to load contacts");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleOpenDialog = (contact?: EmergencyContact, index?: number) => {
     if (contact) {
@@ -50,61 +87,116 @@ const EmergencyContacts = () => {
     setIsDialogOpen(true);
   };
 
-  const handleSaveContact = () => {
+  const handleSaveContact = async () => {
+    if (!user) {
+      toast.error("You must be logged in to save contacts");
+      return;
+    }
+    
     if (!currentContact.name || !currentContact.phone) {
-      toast({
-        title: "Missing information",
-        description: "Please provide at least a name and phone number",
-        variant: "destructive"
-      });
+      toast.error("Please provide at least a name and phone number");
       return;
     }
 
-    let newContacts = [...contacts];
-    
-    if (editIndex !== null) {
-      // Edit existing contact
-      newContacts[editIndex] = currentContact;
-    } else {
-      // Add new contact
-      newContacts.push(currentContact);
-    }
-    
-    // Save to localStorage
     try {
-      const savedProfile = localStorage.getItem("userProfile") || "{}";
-      const profile = JSON.parse(savedProfile);
-      const updatedProfile = {
-        ...profile,
-        emergencyContacts: newContacts
-      };
-      localStorage.setItem("userProfile", JSON.stringify(updatedProfile));
+      let newContactData;
       
-      setContacts(newContacts);
+      // Prepare contact data with user_id
+      const contactData = {
+        ...currentContact,
+        user_id: user.id,
+        type: 'emergency'
+      };
+      
+      if (editIndex !== null && currentContact.id) {
+        // Update existing contact in Supabase
+        const { data, error } = await supabase
+          .from('contacts')
+          .update(contactData)
+          .eq('id', currentContact.id)
+          .select()
+          .single();
+          
+        if (error) throw error;
+        newContactData = data;
+        
+        // Update local state
+        setContacts(prev => 
+          prev.map(contact => contact.id === currentContact.id ? newContactData : contact)
+        );
+      } else {
+        // Insert new contact in Supabase
+        const { data, error } = await supabase
+          .from('contacts')
+          .insert(contactData)
+          .select()
+          .single();
+          
+        if (error) throw error;
+        newContactData = data;
+        
+        // Update local state
+        setContacts(prev => [newContactData, ...prev]);
+      }
+      
       setIsDialogOpen(false);
       
-      toast({
-        title: editIndex !== null ? "Contact updated" : "Contact added",
-        description: editIndex !== null 
-          ? "Your emergency contact has been updated successfully" 
-          : "Your emergency contact has been added successfully"
-      });
-    } catch (e) {
-      console.error("Failed to save contact:", e);
-      toast({
-        title: "Save failed",
-        description: "There was an error saving your contact",
-        variant: "destructive"
-      });
+      toast.success(editIndex !== null ? "Contact updated" : "Contact added");
+    } catch (error) {
+      console.error("Failed to save contact:", error);
+      toast.error("Failed to save contact");
+      
+      // Fallback to localStorage if Supabase fails
+      try {
+        let newContacts = [...contacts];
+        
+        if (editIndex !== null) {
+          // Edit existing contact
+          newContacts[editIndex] = currentContact;
+        } else {
+          // Add new contact
+          newContacts.push(currentContact);
+        }
+        
+        // Save to localStorage
+        const savedProfile = localStorage.getItem("userProfile") || "{}";
+        const profile = JSON.parse(savedProfile);
+        const updatedProfile = {
+          ...profile,
+          emergencyContacts: newContacts
+        };
+        localStorage.setItem("userProfile", JSON.stringify(updatedProfile));
+        
+        setContacts(newContacts);
+        setIsDialogOpen(false);
+        
+        toast.success(editIndex !== null ? "Contact saved locally" : "Contact added locally");
+      } catch (e) {
+        console.error("Failed to save contact to localStorage:", e);
+        toast.error("Failed to save contact even to local storage");
+      }
     }
   };
 
-  const handleDeleteContact = (index: number) => {
-    const newContacts = [...contacts];
-    newContacts.splice(index, 1);
-    
-    // Save to localStorage
+  const handleDeleteContact = async (contact: EmergencyContact, index: number) => {
     try {
+      if (contact.id && user) {
+        // Delete from Supabase if it exists there
+        const { error } = await supabase
+          .from('contacts')
+          .delete()
+          .eq('id', contact.id)
+          .eq('user_id', user.id);
+          
+        if (error) throw error;
+      }
+      
+      // Update local state
+      const newContacts = [...contacts];
+      newContacts.splice(index, 1);
+      setContacts(newContacts);
+      
+      // Also update localStorage
       const savedProfile = localStorage.getItem("userProfile") || "{}";
       const profile = JSON.parse(savedProfile);
       const updatedProfile = {
@@ -113,19 +205,10 @@ const EmergencyContacts = () => {
       };
       localStorage.setItem("userProfile", JSON.stringify(updatedProfile));
       
-      setContacts(newContacts);
-      
-      toast({
-        title: "Contact deleted",
-        description: "Your emergency contact has been removed"
-      });
+      toast.success("Contact deleted");
     } catch (e) {
       console.error("Failed to delete contact:", e);
-      toast({
-        title: "Delete failed",
-        description: "There was an error removing your contact",
-        variant: "destructive"
-      });
+      toast.error("Failed to delete contact");
     }
   };
 
@@ -138,11 +221,20 @@ const EmergencyContacts = () => {
         </Button>
       </div>
 
-      {contacts.length > 0 ? (
+      {isLoading ? (
+        <div className="space-y-3">
+          {[1, 2].map((item) => (
+            <div 
+              key={item} 
+              className="bg-muted animate-pulse h-24 rounded-lg"
+            ></div>
+          ))}
+        </div>
+      ) : contacts.length > 0 ? (
         <div className="space-y-3">
           {contacts.map((contact, index) => (
             <button
-              key={index}
+              key={contact.id || index}
               className="w-full flex items-center justify-between p-4 bg-card rounded-lg shadow-subtle hover:bg-accent/50 transition-colors"
               onClick={() => handleOpenDialog(contact, index)}
             >
@@ -227,7 +319,7 @@ const EmergencyContacts = () => {
               <Button 
                 variant="destructive" 
                 onClick={() => {
-                  handleDeleteContact(editIndex);
+                  handleDeleteContact(currentContact, editIndex);
                   setIsDialogOpen(false);
                 }}
               >

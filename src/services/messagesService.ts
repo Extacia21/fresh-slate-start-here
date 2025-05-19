@@ -23,6 +23,7 @@ export const useGetMessages = (chatRoomId?: string, recipientId?: string) => {
       return data as Message[];
     },
     enabled: !!chatRoomId || !!recipientId, // Only run query when either parameter is provided
+    refetchInterval: 30000, // Poll every 30 seconds for new messages
   });
 };
 
@@ -87,4 +88,10 @@ export const useSubscribeToMessages = (
     const unsubscribe = subscribeToMessages(chatRoomId, callback);
     return unsubscribe;
   }, [chatRoomId, callback]);
+};
+
+// Format message timestamp
+export const formatMessageTime = (timestamp: string): string => {
+  const date = new Date(timestamp);
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
