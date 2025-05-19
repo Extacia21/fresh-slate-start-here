@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { 
@@ -11,220 +12,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import LocationMap from "@/components/common/LocationMap";
 import ShareDialog from "@/components/common/ShareDialog";
-
-interface Alert {
-  id: number;
-  title: string;
-  message: string;
-  severity: "critical" | "high" | "medium" | "low";
-  time: string;
-  icon: any;
-  category: string;
-  location?: string;
-  source?: string;
-  affected?: {
-    area: string;
-    population: string;
-    facilities?: string[]
-  };
-  instructions?: string[];
-  updates?: { time: string; content: string }[];
-  contacts?: { name: string; role: string; phone?: string }[];
-  resourceLinks?: { title: string; description: string; url: string }[];
-  endTime?: string;
-}
-
-// Mock data - in a real app this would come from an API
-const mockAlertDetails: Record<string, Alert> = {
-  "1": {
-    id: 1,
-    title: "Flash Flood Warning",
-    message: "Flash flood warning issued for your area. Avoid low-lying areas and stay indoors.",
-    severity: "high",
-    time: "10 minutes ago",
-    icon: CloudRain,
-    category: "weather",
-    location: "Downtown area, Riverside, and East Valley",
-    source: "National Weather Service",
-    affected: {
-      area: "Approximately 15 square miles",
-      population: "Estimated 25,000 residents",
-      facilities: [
-        "Downtown Medical Center",
-        "Riverside Elementary School",
-        "East Valley Shopping Mall"
-      ]
-    },
-    instructions: [
-      "Move to higher ground immediately if near streams or rivers",
-      "Do not drive through flooded roads - turn around, don't drown",
-      "Keep emergency supplies ready",
-      "Monitor local news and weather updates"
-    ],
-    updates: [
-      { time: "9:45 AM", content: "Flash flood warning issued for the county" },
-      { time: "10:15 AM", content: "First responders deployed to downtown area" },
-      { time: "10:30 AM", content: "Evacuation orders issued for Riverside district" },
-      { time: "11:05 AM", content: "Water levels rising at East Valley creek, additional roads closed" },
-      { time: "11:30 AM", content: "Emergency shelter opened at North High School gymnasium" }
-    ],
-    contacts: [
-      { name: "Emergency Management Office", role: "Coordination", phone: "555-123-4567" },
-      { name: "Police Department", role: "Evacuation assistance", phone: "555-911" },
-      { name: "Public Works", role: "Road closures and drainage", phone: "555-789-0123" }
-    ],
-    resourceLinks: [
-      { title: "Flood Safety Guide", description: "Comprehensive guide for flood preparedness", url: "#" },
-      { title: "Live Evacuation Map", description: "Real-time updates on evacuation zones", url: "#" },
-      { title: "Emergency Shelter Locations", description: "List of all available shelters", url: "#" }
-    ],
-    endTime: "Warning in effect until 4:00 PM today"
-  },
-  "2": {
-    id: 2,
-    title: "Weather Advisory",
-    message: "Strong thunderstorms expected this afternoon with possible hail.",
-    severity: "medium",
-    time: "1 hour ago",
-    icon: CloudLightning,
-    category: "weather",
-    location: "Entire county",
-    source: "National Weather Service",
-    affected: {
-      area: "County-wide",
-      population: "All residents",
-      facilities: [
-        "All outdoor facilities",
-        "Public parks",
-        "Sporting events"
-      ]
-    },
-    instructions: [
-      "Secure outdoor items",
-      "Avoid unnecessary travel",
-      "Stay indoors during the storm",
-      "Keep phones charged and emergency contacts accessible"
-    ],
-    updates: [
-      { time: "8:00 AM", content: "Weather advisory issued for afternoon storms" },
-      { time: "9:30 AM", content: "Advisory updated to include potential for hail" },
-      { time: "11:00 AM", content: "Storm front expected to reach western county by 2 PM" }
-    ],
-    contacts: [
-      { name: "Weather Service Hotline", role: "Updates", phone: "555-432-1098" },
-      { name: "Power Company", role: "Outage reporting", phone: "555-765-4321" }
-    ],
-    resourceLinks: [
-      { title: "Thunderstorm Safety", description: "How to stay safe during severe storms", url: "#" },
-      { title: "Power Outage Map", description: "Real-time tracking of power outages", url: "#" }
-    ],
-    endTime: "Advisory in effect until 8:00 PM today"
-  },
-  "3": {
-    id: 3,
-    title: "Traffic Alert",
-    message: "Major accident on Highway 101. Expect delays of 30+ minutes.",
-    severity: "medium",
-    time: "2 hours ago",
-    icon: AlertTriangle,
-    category: "traffic",
-    location: "Highway 101 between exits 25-30",
-    source: "Department of Transportation",
-    affected: {
-      area: "5-mile stretch of Highway 101",
-      population: "Commuters and travelers",
-      facilities: [
-        "North County Business Park",
-        "Airport access routes"
-      ]
-    },
-    instructions: [
-      "Seek alternative routes",
-      "Expect significant delays",
-      "Follow police instructions in the area",
-      "Drive with caution near the accident site"
-    ],
-    updates: [
-      { time: "7:15 AM", content: "Multi-vehicle accident reported on Highway 101" },
-      { time: "7:45 AM", content: "Two lanes blocked, emergency services on scene" },
-      { time: "8:30 AM", content: "Tow trucks arrived, expect 30+ minute delays" },
-      { time: "9:15 AM", content: "One lane reopened, still heavy congestion in area" }
-    ],
-    contacts: [
-      { name: "Traffic Management Center", role: "Updates", phone: "555-101-5555" },
-      { name: "Highway Patrol", role: "Assistance", phone: "555-111-2222" }
-    ],
-    resourceLinks: [
-      { title: "Live Traffic Map", description: "Real-time traffic conditions", url: "#" },
-      { title: "Alternative Routes", description: "Suggested detours for affected areas", url: "#" }
-    ],
-    endTime: "Expected to clear by 11:00 AM"
-  },
-  "4": {
-    id: 4,
-    title: "Power Outage",
-    message: "Scheduled maintenance outage in your area from 10pm-2am tonight.",
-    severity: "low",
-    time: "3 hours ago",
-    icon: Info,
-    category: "utility",
-    location: "North County districts",
-    source: "Power & Electric Company",
-    affected: {
-      area: "North County residential areas",
-      population: "Approximately 2,500 households",
-      facilities: [
-        "Residential neighborhoods only",
-        "No critical infrastructure affected"
-      ]
-    },
-    instructions: [
-      "Charge essential devices before 10pm",
-      "Have emergency lighting ready",
-      "Unplug sensitive electronics",
-      "Keep refrigerator doors closed to maintain temperature"
-    ],
-    updates: [
-      { time: "9:00 AM", content: "Scheduled maintenance confirmed for tonight" },
-      { time: "11:00 AM", content: "Reminder notification sent to affected households" },
-      { time: "2:00 PM", content: "Maintenance crews preparing for scheduled work" }
-    ],
-    contacts: [
-      { name: "Power & Electric Customer Service", role: "Information", phone: "555-444-3333" },
-      { name: "Emergency Services", role: "For medical device users", phone: "555-111-2222" }
-    ],
-    resourceLinks: [
-      { title: "Power Outage Preparation Guide", description: "How to prepare for scheduled outages", url: "#" },
-      { title: "Maintenance Schedule", description: "Calendar of planned maintenance activities", url: "#" }
-    ],
-    endTime: "Expected to restore service by 2:00 AM"
-  },
-};
+import { useGetAlertById, formatRelativeTime, alertTypeColors } from "@/services/alertsService";
 
 const AlertDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const [alert, setAlert] = useState<Alert | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: alert, isLoading, error } = useGetAlertById(id);
   const navigate = useNavigate();
   const [liveUpdates, setLiveUpdates] = useState<{ time: string; content: string }[]>([]);
   const [showShareDialog, setShowShareDialog] = useState(false);
 
+  // Initialize any existing updates when the alert loads
   useEffect(() => {
-    // Simulate API fetch
-    const timer = setTimeout(() => {
-      if (id && mockAlertDetails[id]) {
-        setAlert(mockAlertDetails[id]);
-        
-        // Initialize live updates with any existing updates from the alert
-        if (mockAlertDetails[id].updates) {
-          setLiveUpdates(mockAlertDetails[id].updates || []);
-        }
-      }
-      setIsLoading(false);
-    }, 800);
-
-    return () => clearTimeout(timer);
-  }, [id]);
+    if (alert) {
+      // If alert has updates field, use it, otherwise start with empty array
+      const initialUpdates = alert.updates ? 
+        (Array.isArray(alert.updates) ? alert.updates : []) : 
+        [];
+      
+      setLiveUpdates(initialUpdates);
+    }
+  }, [alert]);
 
   // Simulate real-time updates
   useEffect(() => {
@@ -265,6 +72,26 @@ const AlertDetail = () => {
     }
   };
 
+  const getAlertTypeColor = (type: string = 'other') => {
+    const typeKey = type.toLowerCase() as keyof typeof alertTypeColors;
+    return alertTypeColors[typeKey] || alertTypeColors.other;
+  };
+
+  const getIconComponent = (type: string = 'other') => {
+    switch (type?.toLowerCase()) {
+      case 'weather':
+        return CloudRain;
+      case 'fire':
+        return AlertTriangle;
+      case 'police':
+        return Shield;
+      case 'health':
+        return Info;
+      default:
+        return AlertTriangle;
+    }
+  };
+
   const handleShareAlert = () => {
     setShowShareDialog(true);
   };
@@ -298,7 +125,7 @@ const AlertDetail = () => {
     );
   }
 
-  if (!alert) {
+  if (error || !alert) {
     return (
       <div className="page-container">
         <div className="flex items-center mb-6">
@@ -327,8 +154,23 @@ const AlertDetail = () => {
     );
   }
 
-  const Icon = alert.icon || Info;
+  const Icon = getIconComponent(alert.type);
+  const typeColor = getAlertTypeColor(alert.type);
   const shareUrl = window.location.href;
+  const formattedTime = formatRelativeTime(alert.created_at);
+
+  // Mock data for sections we don't have in the actual alert model
+  const mockInstructions = [
+    "Stay indoors and close all windows",
+    "Follow official guidance on evacuation routes",
+    "Keep emergency supplies ready",
+    "Monitor local news and updates"
+  ];
+
+  const mockContacts = [
+    { name: "Emergency Services", role: "Coordination", phone: "911" },
+    { name: "Local Police", role: "Safety", phone: "555-123-4567" }
+  ];
 
   return (
     <div className="page-container pb-24 overflow-y-auto">
@@ -353,8 +195,8 @@ const AlertDetail = () => {
 
       <div className={`p-4 rounded-lg mb-6 ${getSeverityColor(alert.severity)} bg-opacity-10 border border-opacity-30 ${getSeverityColor(alert.severity).replace('bg-', 'border-')}`}>
         <div className="flex items-center mb-2">
-          <div className={`p-2 rounded-full ${getSeverityColor(alert.severity)} bg-opacity-20 mr-3`}>
-            <Icon className={`h-6 w-6 ${alert.severity === "low" ? "text-yellow-600" : "text-white"}`} />
+          <div className={`p-2 rounded-full ${typeColor.bg} mr-3`}>
+            <Icon className={`h-6 w-6 ${typeColor.icon}`} />
           </div>
           <div>
             <h1 className="text-xl font-bold">{alert.title}</h1>
@@ -364,11 +206,11 @@ const AlertDetail = () => {
             </div>
           </div>
         </div>
-        <p className="text-base mb-3">{alert.message}</p>
+        <p className="text-base mb-3">{alert.description}</p>
         <div className="flex flex-wrap items-center justify-between text-xs opacity-70">
           <div className="flex items-center mr-4 mb-1">
             <Clock className="h-3 w-3 mr-1" /> 
-            <span>Issued: {alert.time}</span>
+            <span>Reported: {formattedTime}</span>
           </div>
           {alert.location && (
             <div className="flex items-center mb-1">
@@ -376,9 +218,9 @@ const AlertDetail = () => {
               <span>{alert.location}</span>
             </div>
           )}
-          {alert.endTime && (
+          {alert.status && (
             <div className="w-full mt-2 pt-2 border-t border-current border-opacity-20">
-              <span className="font-medium">{alert.endTime}</span>
+              <span className="font-medium capitalize">Status: {alert.status}</span>
             </div>
           )}
         </div>
@@ -399,38 +241,26 @@ const AlertDetail = () => {
       )}
 
       <div className="space-y-6">
-        {alert.affected && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center">
-                <AlertOctagon className="h-5 w-5 mr-2" />
-                Affected Area
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <span>{alert.affected.area}</span>
-                </div>
-                <div className="flex items-center">
-                  <Users className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <span>{alert.affected.population}</span>
-                </div>
-                {alert.affected.facilities && alert.affected.facilities.length > 0 && (
-                  <div className="mt-2">
-                    <h4 className="text-sm font-medium mb-1">Key Facilities Affected:</h4>
-                    <ul className="pl-5 list-disc text-sm">
-                      {alert.affected.facilities.map((facility, index) => (
-                        <li key={index}>{facility}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center">
+              <AlertOctagon className="h-5 w-5 mr-2" />
+              Affected Area
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="flex items-center">
+                <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
+                <span>{alert.location || "Unknown location"}</span>
               </div>
-            </CardContent>
-          </Card>
-        )}
+              <div className="flex items-center">
+                <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+                <span>Area residents</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader className="pb-2">
@@ -441,7 +271,7 @@ const AlertDetail = () => {
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
-              {alert.instructions?.map((instruction, index) => (
+              {mockInstructions.map((instruction, index) => (
                 <li key={index} className="flex items-start">
                   <span className="inline-block bg-primary rounded-full w-1.5 h-1.5 mt-2 mr-2"></span>
                   <span>{instruction}</span>
@@ -474,79 +304,54 @@ const AlertDetail = () => {
           </CardContent>
         </Card>
 
-        {alert.contacts && alert.contacts.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center">
-                <Phone className="h-5 w-5 mr-2" />
-                Emergency Contacts
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {alert.contacts.map((contact, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{contact.name}</p>
-                      <p className="text-xs text-muted-foreground">{contact.role}</p>
-                    </div>
-                    {contact.phone && (
-                      <Button variant="outline" size="sm">
-                        <Phone className="h-3 w-3 mr-2" />
-                        {contact.phone}
-                      </Button>
-                    )}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center">
+              <Phone className="h-5 w-5 mr-2" />
+              Emergency Contacts
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {mockContacts.map((contact, index) => (
+                <div key={index} className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{contact.name}</p>
+                    <p className="text-xs text-muted-foreground">{contact.role}</p>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {alert.resourceLinks && alert.resourceLinks.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center">
-                <FileText className="h-5 w-5 mr-2" />
-                Helpful Resources
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {alert.resourceLinks.map((link, index) => (
-                  <div key={index} className="p-3 bg-muted rounded-lg">
-                    <p className="font-medium">{link.title}</p>
-                    <p className="text-sm text-muted-foreground mb-2">{link.description}</p>
-                    <Button variant="secondary" size="sm" className="w-full">
-                      <Compass className="h-3 w-3 mr-2" />
-                      Open Resource
+                  {contact.phone && (
+                    <Button variant="outline" size="sm">
+                      <Phone className="h-3 w-3 mr-2" />
+                      {contact.phone}
                     </Button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <div className="bg-muted p-4 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <Info className="h-4 w-4 mr-2 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Source: {alert.source}</span>
+                  )}
+                </div>
+              ))}
             </div>
-            <Button variant="ghost" size="sm">
-              <MessageCircle className="h-4 w-4 mr-2" />
-              Report Issue
-            </Button>
+          </CardContent>
+        </Card>
+
+        {alert.source && (
+          <div className="bg-muted p-4 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Info className="h-4 w-4 mr-2 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Source: {alert.source}</span>
+              </div>
+              <Button variant="ghost" size="sm">
+                <MessageCircle className="h-4 w-4 mr-2" />
+                Report Issue
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <ShareDialog 
         open={showShareDialog}
         onOpenChange={setShowShareDialog}
         title={alert.title}
-        description={alert.message}
+        description={alert.description}
         url={shareUrl}
       />
     </div>

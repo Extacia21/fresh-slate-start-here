@@ -16,6 +16,7 @@ export interface Report {
   is_public: boolean;
   type?: string;
   source?: string;
+  updates?: { time: string; content: string }[];
 }
 
 // Array of mock emergency titles and descriptions for random generation
@@ -92,7 +93,8 @@ function generateRandomReport(): Report {
     severity: randomType.severity[randomSeverityIndex],
     is_public: true,
     type: randomType.type,
-    source: 'official'
+    source: 'official',
+    updates: []
   };
 }
 
@@ -111,7 +113,8 @@ let mockReports: Report[] = [
     severity: 'high',
     is_public: true,
     type: 'weather',
-    source: 'official'
+    source: 'official',
+    updates: []
   },
   {
     id: '2',
@@ -126,7 +129,8 @@ let mockReports: Report[] = [
     severity: 'medium',
     is_public: true,
     type: 'police',
-    source: 'official'
+    source: 'official',
+    updates: []
   },
   {
     id: '3',
@@ -141,7 +145,8 @@ let mockReports: Report[] = [
     severity: 'medium',
     is_public: true,
     type: 'other',
-    source: 'official'
+    source: 'official',
+    updates: []
   }
 ];
 
@@ -200,7 +205,8 @@ export const createReport = async (report: Omit<Report, 'id' | 'created_at' | 'u
       ...report,
       id: `report-${Date.now()}`,
       created_at: timestamp,
-      updated_at: timestamp
+      updated_at: timestamp,
+      updates: []
     };
     
     // Add to our mock reports

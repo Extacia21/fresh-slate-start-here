@@ -95,3 +95,27 @@ export const formatMessageTime = (timestamp: string): string => {
   const date = new Date(timestamp);
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
+
+// Get user conversations (for direct messages)
+export const useGetConversations = () => {
+  return useQuery({
+    queryKey: ['conversations'],
+    queryFn: async () => {
+      // Get current user session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error("User not authenticated");
+      
+      // Import the function dynamically to avoid circular dependencies
+      const { getConversations } = await import('@/integrations/supabase/messages');
+      
+      const { data, error } = await getConversations(session.user.id);
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      return data || [];
+    },
+    refetchInterval: 30000, // Poll every 30 seconds for new conversations
+  });
+};

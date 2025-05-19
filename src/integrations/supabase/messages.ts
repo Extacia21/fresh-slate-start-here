@@ -97,3 +97,65 @@ export const sendMessage = async (message: Omit<Message, 'id' | 'created_at'>) =
     return { data: null, error };
   }
 };
+
+export const getMessagesByType = async (chatType: "community" | "direct", userId?: string) => {
+  try {
+    let filteredMessages = [...storedMessages].filter(m => m.chat_type === chatType);
+    
+    if (userId && chatType === "direct") {
+      filteredMessages = filteredMessages.filter(m => 
+        m.sender_id === userId || m.recipient_id === userId
+      );
+    }
+    
+    // Sort by timestamp (newest first)
+    filteredMessages.sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    
+    return { data: filteredMessages, error: null };
+  } catch (error) {
+    return { data: null, error };
+  }
+};
+
+export const getConversations = async (userId: string) => {
+  try {
+    // Get all direct messages where the user is either sender or recipient
+    const userMessages = storedMessages.filter(
+      m => m.chat_type === "direct" && (m.sender_id === userId || m.recipient_id === userId)
+    );
+    
+    // Extract unique conversation partners
+    const conversationPartners = new Set<string>();
+    userMessages.forEach(msg => {
+      if (msg.sender_id === userId && msg.recipient_id) {
+        conversationPartners.add(msg.recipient_id);
+      } else if (msg.recipient_id === userId) {
+        conversationPartners.add(msg.sender_id);
+      }
+    });
+    
+    // Get the most recent message for each conversation
+    const conversations = Array.from(conversationPartners).map(partnerId => {
+      const messages = userMessages.filter(
+        m => (m.sender_id === userId && m.recipient_id === partnerId) || 
+             (m.sender_id === partnerId && m.recipient_id === userId)
+      );
+      
+      messages.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      
+      return {
+        partnerId,
+        lastMessage: messages[0],
+        unreadCount: messages.filter(m => m.sender_id === partnerId).length // Simple unread count
+      };
+    });
+    
+    return { data: conversations, error: null };
+  } catch (error) {
+    return { data: null, error };
+  }
+};
