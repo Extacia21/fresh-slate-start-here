@@ -1,5 +1,5 @@
 
-import { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext, useContext } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGetProfile } from '@/services/profileService';
 
@@ -54,17 +54,19 @@ export const ProfileDataProvider = ({ children }: { children: React.ReactNode })
     refetch();
   };
 
-  return (
-    <ProfileDataContext.Provider
-      value={{
-        profileData,
-        isLoading,
-        error,
-        refetchProfile,
-      }}
-    >
-      {children}
-    </ProfileDataContext.Provider>
+  // Create the provider value
+  const providerValue: ProfileDataContextType = {
+    profileData,
+    isLoading,
+    error,
+    refetchProfile,
+  };
+
+  // Return the JSX for the provider - avoiding direct JSX in .ts file
+  return React.createElement(
+    ProfileDataContext.Provider,
+    { value: providerValue },
+    children
   );
 };
 
