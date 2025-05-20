@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { User, Mail, Phone, MapPin, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfileData } from "@/hooks/use-profile-data";
@@ -13,7 +12,7 @@ import { useUpdateProfile } from "@/services/profileService";
 const PersonalInfo = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { profileData, isLoading } = useProfileData();
+  const { profileData, isLoading, refetchProfile } = useProfileData();
   const updateProfileMutation = useUpdateProfile();
   const [isEditing, setIsEditing] = useState(false);
   const [userInfo, setUserInfo] = useState({
@@ -48,7 +47,7 @@ const PersonalInfo = () => {
         email: user?.email || '',
         phone: profileData.phone || '',
         address: profileData.address || '',
-        dob: "1985-06-15" // Default value as it's not in the database schema
+        dob: profileData.date_of_birth || "1985-06-15" // Use actual DOB if available
       });
     }
   }, [profileData, user]);
@@ -61,22 +60,24 @@ const PersonalInfo = () => {
       await updateProfileMutation.mutateAsync({
         first_name: firstName || null,
         last_name: lastName || null,
+        display_name: userInfo.name, // Add display name
         phone: userInfo.phone || null,
-        address: userInfo.address || null
+        address: userInfo.address || null,
+        date_of_birth: userInfo.dob || null // Save DOB
       });
       
-      toast({
-        title: "Profile updated",
+      // Refetch profile data to update UI
+      refetchProfile();
+      
+      toast.success("Profile updated", {
         description: "Your personal information has been updated successfully"
       });
       
       setIsEditing(false);
     } catch (error: any) {
       console.error("Failed to update profile:", error);
-      toast({
-        title: "Update failed",
-        description: error.message || "There was an error updating your profile",
-        variant: "destructive"
+      toast.error("Update failed", {
+        description: error.message || "There was an error updating your profile"
       });
     }
   };

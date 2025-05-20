@@ -6,10 +6,19 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSendMessage, useGetMessages, useSubscribeToMessages, Message } from "@/services/messagesService";
 import { toast } from "sonner";
+import { useProfileData } from "@/hooks/use-profile-data";
+
+// Define interface for participant
+interface Participant {
+  id: string;
+  name: string;
+  status: 'online' | 'offline';
+}
 
 const Chat = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { profileData } = useProfileData();
   const [searchParams] = useSearchParams();
   const contactName = searchParams.get('contact') || 'Community Emergency Chat';
   const contactPhone = searchParams.get('phone');
@@ -19,6 +28,8 @@ const Chat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [showParticipants, setShowParticipants] = useState(false);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [userName, setUserName] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -26,16 +37,42 @@ const Chat = () => {
   const { data: messagesData, isLoading } = useGetMessages(chatRoomId);
   const sendMessageMutation = useSendMessage();
 
+  // Get current user's name
+  useEffect(() => {
+    if (profileData) {
+      const name = profileData.display_name || 
+                  (profileData.first_name ? 
+                    (profileData.last_name ? 
+                      `${profileData.first_name} ${profileData.last_name}` : 
+                      profileData.first_name) : 
+                    user?.user_metadata?.full_name || 
+                    user?.user_metadata?.name || 
+                    user?.email?.split('@')[0] || 
+                    'User');
+      setUserName(name);
+    }
+  }, [profileData, user]);
+
+  // Initialize participants with current user
+  useEffect(() => {
+    if (user && userName) {
+      setParticipants([
+        { id: user.id, name: userName, status: 'online' },
+        { id: "emergency-services", name: "Emergency Services", status: 'online' },
+        { id: "community-support", name: "Community Support", status: 'online' },
+      ]);
+    }
+  }, [user, userName]);
+
   // Handle new message callback
   const handleNewMessage = useCallback((newMessage: Message) => {
     // Only add if it's not from the current user to avoid duplicates
-    // (since we're optimistically adding sent messages)
     if (newMessage.sender_id !== user?.id) {
       setMessages(prevMessages => [...prevMessages, newMessage]);
     }
   }, [user]);
 
-  // Subscribe to new messages using the fixed hook
+  // Subscribe to new messages
   useSubscribeToMessages(chatRoomId, handleNewMessage);
 
   // Set messages when loaded from Supabase
@@ -67,6 +104,7 @@ const Chat = () => {
         is_group_message: isGroupChat,
         message_text: newMessage,
         created_at: new Date().toISOString(),
+        sender_name: userName // Add the sender name
       };
       
       setMessages(prevMessages => [...prevMessages, optimisticMessage]);
@@ -78,7 +116,8 @@ const Chat = () => {
         recipient_id: contactPhone ? undefined : null,
         chat_room_id: chatRoomId,
         is_group_message: isGroupChat,
-        message_text: newMessage
+        message_text: newMessage,
+        sender_name: userName // Include sender name
       };
 
       await sendMessageMutation.mutateAsync(messageToSend);
@@ -97,14 +136,15 @@ const Chat = () => {
     }
   };
 
-  // Mock participants data (in a real app, this would come from the database)
-  const participants = [
-    { name: "Sarah", status: "online" },
-    { name: "Michael", status: "online" },
-    { name: "Emergency Services", status: "online" },
-    { name: "John", status: "offline" },
-    { name: "Lisa", status: "offline" },
-  ];
+  // Find sender name from participants or use a default
+  const getSenderName = (message: Message) => {
+    if (message.sender_name) return message.sender_name;
+    
+    if (message.sender_id === user?.id) return userName;
+    
+    const participant = participants.find(p => p.id === message.sender_id);
+    return participant?.name || "Unknown User";
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -160,7 +200,7 @@ const Chat = () => {
               </div>
             ) : (
               <div className="space-y-4 pb-20">
-                {messages.map((message, index) => (
+                {messages.map((message) => (
                   <div
                     key={message.id}
                     className={`flex ${
@@ -174,6 +214,12 @@ const Chat = () => {
                           : "bg-secondary"
                       }`}
                     >
+                      {/* Show sender name for messages not sent by the current user */}
+                      {message.sender_id !== user?.id && (
+                        <p className="text-xs font-medium mb-1">
+                          {getSenderName(message)}
+                        </p>
+                      )}
                       <p className="text-sm">{message.message_text}</p>
                       <p className="text-xs mt-1 opacity-70 text-right">
                         {new Date(message.created_at).toLocaleTimeString([], { 

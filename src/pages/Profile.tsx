@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { User, Shield, Settings, ChevronRight, LogOut, MapPin, Phone, Droplet, Heart, Bell } from "lucide-react";
@@ -55,9 +54,14 @@ const Profile = () => {
         ? profileData.allergies 
         : (profileData.allergies ? profileData.allergies.split(',') : []);
       
+      // Build location from city and state if available
+      const location = profileData.city 
+        ? `${profileData.city}${profileData.state ? `, ${profileData.state}` : ''}`
+        : 'No location set';
+      
       setUserProfile({
         name: name,
-        location: profileData.city ? `${profileData.city}, ${profileData.state || ''}`.trim() : 'No location set',
+        location: location,
         phone: profileData.phone || 'No phone set',
         email: user?.email || 'No email set',
         bloodType: "",
@@ -104,15 +108,6 @@ const Profile = () => {
         setNotificationSettings(JSON.parse(savedSettings));
       } catch (e) {
         console.error("Failed to parse saved notification settings");
-      }
-    }
-    
-    const savedProfile = localStorage.getItem("userProfile");
-    if (savedProfile) {
-      try {
-        setUserProfile(JSON.parse(savedProfile));
-      } catch (e) {
-        console.error("Failed to parse saved user profile");
       }
     }
   }, []);

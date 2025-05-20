@@ -24,13 +24,16 @@ const Home = () => {
   // Set user name from profile data
   useEffect(() => {
     if (profileData) {
-      // Use display_name from auth if available, otherwise fallback to first_name or email
+      // Use display_name from profile if available, otherwise fallback to first_name or email
       const name = profileData.display_name || 
-                  profileData.first_name || 
-                  user?.user_metadata?.full_name || 
-                  user?.user_metadata?.name || 
-                  user?.email?.split('@')[0] || 
-                  'User';
+                  (profileData.first_name ? 
+                    (profileData.last_name ? 
+                      `${profileData.first_name} ${profileData.last_name}` : 
+                      profileData.first_name) : 
+                    user?.user_metadata?.full_name || 
+                    user?.user_metadata?.name || 
+                    user?.email?.split('@')[0] || 
+                    'User');
       setUserName(name);
     }
   }, [profileData, user]);

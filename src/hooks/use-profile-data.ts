@@ -52,7 +52,6 @@ export const ProfileDataProvider = ({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (data) {
-      // Support for both string and string[] types for medical_conditions, medications, and allergies
       setProfileData(data);
     }
   }, [data]);
