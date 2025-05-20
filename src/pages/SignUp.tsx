@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -42,7 +43,11 @@ const SignUp = () => {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
     try {
-      const response = await authService.signUp(values);
+      const response = await authService.signUp({
+        email: values.email,
+        password: values.password,
+        name: values.name
+      });
 
       if (response.success) {
         // Show success toast with instructions to check email

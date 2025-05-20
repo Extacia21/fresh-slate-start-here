@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,7 +24,8 @@ const defaultContacts = [
     type: 'emergency',
     is_favorite: true,
     created_at: new Date().toISOString(),
-    user_id: null
+    user_id: null,
+    email: 'police@chinhoyi.gov.zw'
   },
   {
     id: 'chinhoyi-ambulance',
@@ -32,7 +34,8 @@ const defaultContacts = [
     type: 'emergency',
     is_favorite: true,
     created_at: new Date().toISOString(),
-    user_id: null
+    user_id: null,
+    email: 'ambulance@chinhoyi.gov.zw'
   },
   {
     id: 'chinhoyi-fire',
@@ -41,7 +44,8 @@ const defaultContacts = [
     type: 'emergency',
     is_favorite: true,
     created_at: new Date().toISOString(),
-    user_id: null
+    user_id: null,
+    email: 'fire@chinhoyi.gov.zw'
   },
   {
     id: 'chinhoyi-hospital',
@@ -50,7 +54,8 @@ const defaultContacts = [
     type: 'emergency',
     is_favorite: true,
     created_at: new Date().toISOString(),
-    user_id: null
+    user_id: null,
+    email: 'hospital@chinhoyi.gov.zw'
   },
   {
     id: 'chinhoyi-towing',
@@ -59,7 +64,8 @@ const defaultContacts = [
     type: 'service',
     is_favorite: false,
     created_at: new Date().toISOString(),
-    user_id: null
+    user_id: null,
+    email: 'towing@chinhoyi.gov.zw'
   },
   {
     id: 'chinhoyi-emergency',
@@ -68,7 +74,8 @@ const defaultContacts = [
     type: 'emergency',
     is_favorite: true,
     created_at: new Date().toISOString(),
-    user_id: null
+    user_id: null,
+    email: 'emergency@chinhoyi.gov.zw'
   },
 ];
 

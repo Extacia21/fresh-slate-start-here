@@ -1,6 +1,6 @@
 
 import { useEffect, useRef, useState } from "react";
-import { MapPin, Navigation, Compass, Hospital, Shield, FireExtinguisher, BuildingCommunity, AssemblyPoint, EmergencyShelter } from "lucide-react";
+import { MapPin, Navigation, Compass, Hospital, Shield, Building, School, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -41,7 +41,7 @@ const emergencyLocations: EmergencyLocation[] = [
     coordinates: [-17.3627, 30.1953],
     address: "Fire Brigade Road, Chinhoyi, Zimbabwe",
     phone: "+263 67 2122911",
-    icon: FireExtinguisher
+    icon: Building
   },
   {
     id: 4,
@@ -50,7 +50,7 @@ const emergencyLocations: EmergencyLocation[] = [
     coordinates: [-17.3698, 30.2003],
     address: "Community Drive, Chinhoyi, Zimbabwe",
     phone: "+263 67 2123456",
-    icon: BuildingCommunity
+    icon: Building
   },
   {
     id: 5,
@@ -58,7 +58,7 @@ const emergencyLocations: EmergencyLocation[] = [
     category: "assembly",
     coordinates: [-17.3612, 30.1932],
     address: "Main Park, Chinhoyi, Zimbabwe",
-    icon: AssemblyPoint
+    icon: School
   },
   {
     id: 6,
@@ -67,7 +67,7 @@ const emergencyLocations: EmergencyLocation[] = [
     coordinates: [-17.3584, 30.1986],
     address: "School Road, Chinhoyi, Zimbabwe",
     phone: "+263 67 2124567",
-    icon: EmergencyShelter
+    icon: Home
   },
   {
     id: 7,

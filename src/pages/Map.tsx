@@ -4,7 +4,7 @@ import { MapPin } from "lucide-react";
 import EmergencyMap from "@/components/common/EmergencyMap";
 
 const Map = () => {
-  const [location, setLocation] = useState("Chinhoyi, Zimbabwe");
+  const [location] = useState("Chinhoyi, Zimbabwe");
   
   return (
     <div className="flex flex-col h-full">

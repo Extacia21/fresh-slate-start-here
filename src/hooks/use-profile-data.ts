@@ -1,60 +1,71 @@
 
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { useState, useEffect, createContext, useContext } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useGetProfile } from '@/services/profileService';
 
-interface ProfileData {
-  id: string;
-  first_name?: string | null;
-  last_name?: string | null;
-  avatar_url?: string | null;
-  phone?: string | null;
-  city?: string | null;
-  state?: string | null;
+// Define ProfileData interface
+export interface ProfileData {
+  id?: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  address?: string;
+  date_of_birth?: string;
+  gender?: string;
+  blood_type?: string;
+  medical_conditions?: string[];
+  medications?: string[];
+  emergency_notes?: string;
+  allergies?: string[];
+  avatar_url?: string;
   created_at?: string;
-  address?: string | null;
-  allergies?: string | null;
-  // Additional user metadata from auth
-  email?: string | null;
-  display_name?: string | null;
+  updated_at?: string;
 }
 
-export function useProfileData() {
+// Create context
+interface ProfileDataContextType {
+  profileData: ProfileData | null;
+  isLoading: boolean;
+  error: Error | null;
+  refetchProfile: () => void;
+}
+
+const ProfileDataContext = createContext<ProfileDataContextType>({
+  profileData: null,
+  isLoading: false,
+  error: null,
+  refetchProfile: () => {},
+});
+
+// Provider component
+export const ProfileDataProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
+  const { data, isLoading, error, refetch } = useGetProfile();
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
 
-  const query = useQuery({
-    queryKey: ['profile', user?.id],
-    queryFn: async (): Promise<ProfileData | null> => {
-      if (!user) return null;
-      
-      // Fetch profile data
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      
-      if (profileError && profileError.code !== 'PGRST116') {
-        throw new Error(profileError.message);
-      }
-      
-      // Get user metadata
-      const { data: { user: userData } } = await supabase.auth.getUser();
-      
-      // Merge profile data with user metadata
-      return {
-        ...(profileData || { id: user.id }),
-        email: user.email,
-        display_name: userData?.user_metadata?.full_name || userData?.user_metadata?.name || null
-      } as ProfileData;
-    },
-    enabled: !!user,
-  });
+  useEffect(() => {
+    if (data) {
+      setProfileData(data);
+    }
+  }, [data]);
 
-  return {
-    profileData: query.data,
-    isLoading: query.isLoading,
-    isError: query.isError,
-    error: query.error,
+  const refetchProfile = () => {
+    refetch();
   };
-}
+
+  return (
+    <ProfileDataContext.Provider
+      value={{
+        profileData,
+        isLoading,
+        error,
+        refetchProfile,
+      }}
+    >
+      {children}
+    </ProfileDataContext.Provider>
+  );
+};
+
+// Hook to use the profile data
+export const useProfileData = () => useContext(ProfileDataContext);
