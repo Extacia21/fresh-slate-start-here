@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, formatDistanceToNow } from "date-fns";
@@ -11,6 +10,7 @@ export interface Alert {
   title: string;
   description: string;
   alert_type: AlertType;
+  type?: string; // Adding this property to fix type errors
   severity: "low" | "medium" | "high" | "critical";
   latitude: number;
   longitude: number;
@@ -20,7 +20,7 @@ export interface Alert {
   created_at: string;
   updated_at: string;
   created_by: string;
-  // Additional properties that might not be in all alert objects
+  // Additional properties
   status?: string;
   is_resolved?: boolean;
   category?: string;
@@ -78,8 +78,8 @@ export const formatRelativeTime = (dateString: string): string => {
   }
 };
 
-// Get all alerts
-export const useGetAlerts = () => {
+// Get all alerts (renamed from useGetAlerts to useGetAllAlerts to match usage)
+export const useGetAllAlerts = () => {
   return useQuery({
     queryKey: ["alerts"],
     queryFn: async () => {
@@ -92,10 +92,22 @@ export const useGetAlerts = () => {
         throw new Error(error.message);
       }
       
-      return data as Alert[];
+      return (data || []).map(alert => ({
+        ...alert,
+        type: alert.alert_type, // Add type property that matches alert_type for compatibility
+        location: alert.location || `${alert.latitude.toFixed(6)}, ${alert.longitude.toFixed(6)}`,
+        status: alert.status || "active",
+        is_resolved: alert.is_resolved || false,
+        category: alert.category || alert.alert_type,
+        user_id: alert.user_id || alert.created_by,
+        updates: alert.updates || []
+      })) as Alert[];
     },
   });
 };
+
+// Keep the original useGetAlerts for backward compatibility
+export const useGetAlerts = useGetAllAlerts;
 
 // Get an alert by ID
 export const useGetAlertById = (id: string) => {
@@ -112,7 +124,16 @@ export const useGetAlertById = (id: string) => {
         throw new Error(error.message);
       }
       
-      return data as Alert;
+      return {
+        ...data,
+        type: data.alert_type, // Add type property that matches alert_type for compatibility
+        location: data.location || `${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}`,
+        status: data.status || "active",
+        is_resolved: data.is_resolved || false,
+        category: data.category || data.alert_type,
+        user_id: data.user_id || data.created_by,
+        updates: data.updates || []
+      } as Alert;
     },
     enabled: !!id,
   });
@@ -137,20 +158,16 @@ export const useGetRecentAlerts = () => {
         throw new Error(error.message);
       }
       
-      return data.map(alert => {
-        return {
-          ...alert,
-          location: alert.location || `${alert.latitude.toFixed(6)}, ${alert.longitude.toFixed(6)}`,
-          // Ensure alert has all expected properties even if some are undefined
-          status: alert.status || "active",
-          is_resolved: alert.is_resolved || false,
-          category: alert.category || alert.alert_type,
-          // More formatted data for UI
-          status: alert.status || "active",
-          user_id: alert.user_id || alert.created_by,
-          updates: alert.updates || []
-        } as Alert;
-      });
+      return (data || []).map(alert => ({
+        ...alert,
+        type: alert.alert_type, // Add type property that matches alert_type for compatibility
+        location: alert.location || `${alert.latitude.toFixed(6)}, ${alert.longitude.toFixed(6)}`,
+        status: alert.status || "active",
+        is_resolved: alert.is_resolved || false,
+        category: alert.category || alert.alert_type,
+        user_id: alert.user_id || alert.created_by,
+        updates: alert.updates || []
+      })) as Alert[];
     },
   });
 };
@@ -182,7 +199,10 @@ export const useCreateAlert = () => {
         throw error;
       }
       
-      return data as Alert;
+      return {
+        ...data,
+        type: data.alert_type, // Add type property that matches alert_type for compatibility
+      } as Alert;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["alerts"] });
@@ -191,8 +211,8 @@ export const useCreateAlert = () => {
   });
 };
 
-// Subscribe to alerts (real-time)
-export const useSubscribeToAlerts = (callback: (alerts: Alert[]) => void) => {
+// Subscribe to alerts (real-time) - modified to handle both single alert and array of alerts
+export const useSubscribeToAlerts = (callback: (alerts: Alert[] | Alert) => void) => {
   useQuery({
     queryKey: ["alertsSubscription"],
     queryFn: async () => {
@@ -209,19 +229,18 @@ export const useSubscribeToAlerts = (callback: (alerts: Alert[]) => void) => {
           
           if (!error && data) {
             // Map the data to ensure all properties are present
-            const alerts = data.map(alert => {
-              return {
-                ...alert,
-                location: alert.location || `${alert.latitude.toFixed(6)}, ${alert.longitude.toFixed(6)}`,
-                // Ensure alert has all expected properties even if some are undefined
-                status: alert.status || "active",
-                is_resolved: alert.is_resolved || false,
-                category: alert.category || alert.alert_type,
-                // More formatted data for UI
-                status: alert.status || "active"
-              } as Alert;
-            });
+            const alerts = data.map(alert => ({
+              ...alert,
+              type: alert.alert_type, // Add type property that matches alert_type for compatibility
+              location: alert.location || `${alert.latitude.toFixed(6)}, ${alert.longitude.toFixed(6)}`,
+              status: alert.status || "active",
+              is_resolved: alert.is_resolved || false,
+              category: alert.category || alert.alert_type,
+              user_id: alert.user_id || alert.created_by,
+              updates: alert.updates || []
+            })) as Alert[];
             
+            // Call the callback with the latest alerts
             callback(alerts);
           }
         })
@@ -251,24 +270,23 @@ export const useGetAlertsByType = (type: AlertType) => {
         throw new Error(error.message);
       }
       
-      return data.map(alert => {
-        return {
-          ...alert,
-          location: alert.location || `${alert.latitude.toFixed(6)}, ${alert.longitude.toFixed(6)}`,
-          // Ensure alert has all expected properties even if some are undefined
-          status: alert.status || "active",
-          is_resolved: alert.is_resolved || false,
-          category: alert.category || alert.alert_type,
-          // More formatted data for UI
-          status: alert.status || "active"
-        } as Alert;
-      });
+      return data.map(alert => ({
+        ...alert,
+        type: alert.alert_type, // Add type property that matches alert_type for compatibility
+        location: alert.location || `${alert.latitude.toFixed(6)}, ${alert.longitude.toFixed(6)}`,
+        status: alert.status || "active",
+        is_resolved: alert.is_resolved || false,
+        category: alert.category || alert.alert_type,
+        user_id: alert.user_id || alert.created_by,
+        updates: alert.updates || []
+      })) as Alert[];
     },
   });
 };
 
 // Export default as an object
 export default {
+  useGetAllAlerts,
   useGetAlerts,
   useGetAlertById,
   useGetRecentAlerts,

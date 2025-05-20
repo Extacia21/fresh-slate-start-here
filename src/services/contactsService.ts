@@ -116,12 +116,10 @@ export const sendSOSAlert = async (
       .from("user_alert_history")
       .insert({
         user_id: user.user.id,
-        location,
-        message,
-        contact_count: contacts.length,
+        alert_id: `sos-${Date.now()}`, // Generate a unique ID for the SOS event
         created_at: new Date().toISOString(),
-        status: "sent",
-        alert_type: "sos"
+        dismissed: false,
+        viewed_at: null
       });
     
     if (sosError) {

@@ -24,31 +24,40 @@ const Alerts = () => {
   }, [alertsData]);
 
   // Handle new alert callback
-  const handleNewAlert = useCallback((newAlert: Alert) => {
+  const handleNewAlert = useCallback((newAlerts: Alert[] | Alert) => {
     setAlerts(prevAlerts => {
-      // Check if alert already exists to prevent duplicates
-      if (prevAlerts.some(alert => alert.id === newAlert.id)) {
-        return prevAlerts;
+      // Handle both single alert or array of alerts
+      const alertsArray = Array.isArray(newAlerts) ? newAlerts : [newAlerts];
+      
+      if (alertsArray.length > 0) {
+        // Check for new alerts that we don't already have
+        const newUniqueAlerts = alertsArray.filter(
+          newAlert => !prevAlerts.some(existingAlert => existingAlert.id === newAlert.id)
+        );
+        
+        // Show toast for new unique alerts
+        newUniqueAlerts.forEach(newAlert => {
+          toast.info(`New Alert: ${newAlert.title}`, {
+            description: newAlert.description.substring(0, 50) + (newAlert.description.length > 50 ? '...' : ''),
+            action: {
+              label: 'View',
+              onClick: () => navigate(`/app/alerts/${newAlert.id}`),
+            },
+          });
+        });
+        
+        // If we have new alerts, add them and sort
+        if (newUniqueAlerts.length > 0) {
+          return [...prevAlerts, ...newUniqueAlerts]
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        }
       }
       
-      // Add new alert and sort by creation date
-      const updatedAlerts = [newAlert, ...prevAlerts]
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      
-      // Show toast notification for new alert
-      toast.info(`New Alert: ${newAlert.title}`, {
-        description: newAlert.description.substring(0, 50) + (newAlert.description.length > 50 ? '...' : ''),
-        action: {
-          label: 'View',
-          onClick: () => navigate(`/app/alerts/${newAlert.id}`),
-        },
-      });
-      
-      return updatedAlerts;
+      return prevAlerts;
     });
   }, [navigate]);
   
-  // Subscribe to new alerts using the hook properly
+  // Subscribe to new alerts
   useSubscribeToAlerts(handleNewAlert);
 
   // Apply filters
@@ -57,7 +66,7 @@ const Alerts = () => {
     
     // Apply category filter
     if (activeTab !== "all") {
-      result = result.filter(alert => alert.type === activeTab);
+      result = result.filter(alert => alert.type === activeTab || alert.alert_type === activeTab);
     }
     
     // Apply severity filter
@@ -164,7 +173,7 @@ const Alerts = () => {
                 message={alert.description}
                 severity={alert.severity}
                 time={formatRelativeTime(alert.created_at)}
-                category={alert.type}
+                category={alert.type || alert.alert_type}
                 location={alert.location}
                 onClick={() => handleViewAlert(alert.id.toString())}
               />
