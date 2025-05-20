@@ -17,6 +17,21 @@ export interface Contact {
   created_at?: string;
 }
 
+// Create contact hook
+export const useCreateContact = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (contactData: Omit<Contact, "id" | "created_at" | "user_id">) => {
+      const result = await createContact(contactData);
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contacts"] });
+    },
+  });
+};
+
 // Get all contacts
 export const useGetContacts = () => {
   return useQuery({
@@ -97,18 +112,17 @@ export const sendSOSAlert = async (
     }
     
     // Log the SOS event to the database
-    const { data: sosEvent, error: sosError } = await supabase
-      .from("sos_history")
+    const { error: sosError } = await supabase
+      .from("user_alert_history")
       .insert({
         user_id: user.user.id,
         location,
         message,
         contact_count: contacts.length,
         created_at: new Date().toISOString(),
-        status: "sent"
-      })
-      .select()
-      .single();
+        status: "sent",
+        alert_type: "sos"
+      });
     
     if (sosError) {
       console.error("Error logging SOS event:", sosError);
@@ -172,7 +186,7 @@ export const useUpdateContact = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ id, contact }: { id: string; contact: Partial<Contact> }) => {
+    mutationFn: async ({ id, contact }: { id: string; contact: Partial<Omit<Contact, "id">> }) => {
       const { data, error } = await supabase
         .from("contacts")
         .update(contact)
@@ -244,6 +258,7 @@ export default {
   useGetContacts,
   getEmergencyContacts,
   createContact,
+  useCreateContact,
   useUpdateContact,
   deleteContact,
   useGetFavoriteContacts,

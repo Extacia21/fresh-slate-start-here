@@ -29,8 +29,8 @@ const OnboardingCheck = ({ children }: OnboardingCheckProps) => {
           .eq("id", userData.user.id)
           .single();
 
-        // If profile doesn't exist or is_onboarded is false, redirect to onboarding
-        if (error || !data || !data.is_onboarded) {
+        // If profile doesn't exist or onboarding is not completed, redirect to onboarding
+        if (error || !data || data.onboarding_status !== "completed") {
           setNeedsOnboarding(true);
         }
       } catch (error) {
