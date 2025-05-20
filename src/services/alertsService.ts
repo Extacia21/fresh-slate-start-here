@@ -1,322 +1,248 @@
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
-import type { Report } from "@/integrations/supabase/reports";
-import { getReports, getReportById } from "@/integrations/supabase/reports";
-import { useEffect, useState } from 'react';
-import { toast } from "sonner";
 
-// Since we don't have an alerts table, we'll use reports as alerts
-export interface Alert extends Report {
+import { useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { AlertTriangle, CloudRain, Shield, Info } from "lucide-react";
+
+export interface Alert {
+  id: number;
+  title: string;
+  description: string;
+  location: string;
+  type: string;
   severity: "critical" | "high" | "medium" | "low";
-  source?: "official" | "user-reported" | string;
+  created_at: string;
+  user_id?: string;
+  is_resolved?: boolean;
+  latitude?: number;
+  longitude?: number;
+  category?: string;
 }
 
-// Store alerts in memory to prevent losing them
-let alertsCache: Alert[] = [];
-
-// Color mapping for alert types
-export const alertTypeColors = {
+// Color mapping for different alert types
+export const alertTypeColors: Record<string, { bg: string; text: string; border: string }> = {
   fire: {
-    bg: 'bg-red-100',
-    text: 'text-red-800',
-    icon: 'text-red-600',
-    border: 'border-red-200'
+    bg: "bg-red-50",
+    text: "text-red-600",
+    border: "border-red-200",
   },
   police: {
-    bg: 'bg-yellow-100',
-    text: 'text-yellow-800',
-    icon: 'text-yellow-600',
-    border: 'border-yellow-200'
+    bg: "bg-yellow-50",
+    text: "text-yellow-600",
+    border: "border-yellow-200",
   },
   health: {
-    bg: 'bg-green-100',
-    text: 'text-green-800',
-    icon: 'text-green-600',
-    border: 'border-green-200'
+    bg: "bg-green-50",
+    text: "text-green-600",
+    border: "border-green-200",
   },
   weather: {
-    bg: 'bg-blue-100',
-    text: 'text-blue-800',
-    icon: 'text-blue-600',
-    border: 'border-blue-200'
+    bg: "bg-blue-50",
+    text: "text-blue-600",
+    border: "border-blue-200",
   },
   other: {
-    bg: 'bg-gray-100',
-    text: 'text-gray-800',
-    icon: 'text-gray-600',
-    border: 'border-gray-200'
+    bg: "bg-gray-50",
+    text: "text-gray-600",
+    border: "border-gray-200",
+  },
+};
+
+// Generate random Chinhoyi alerts
+const generateChinhoyiAlerts = (count: number): Alert[] => {
+  const locations = [
+    "Central Chinhoyi",
+    "Chinhoyi University",
+    "Hunyani River Area",
+    "Chinhoyi Caves",
+    "Orange Grove",
+    "Cold Stream"
+  ];
+  
+  const alertTypes = ["fire", "police", "health", "weather"];
+  const severities: ("critical" | "high" | "medium" | "low")[] = ["critical", "high", "medium", "low"];
+  
+  const alerts: Alert[] = [];
+  
+  for (let i = 0; i < count; i++) {
+    const type = alertTypes[Math.floor(Math.random() * alertTypes.length)];
+    const severity = severities[Math.floor(Math.random() * severities.length)];
+    const location = locations[Math.floor(Math.random() * locations.length)];
+    
+    let title = "";
+    let description = "";
+    
+    switch (type) {
+      case "fire":
+        title = `Fire Alert in ${location}`;
+        description = `Fire reported in ${location} area. Emergency services responding.`;
+        break;
+      case "police":
+        title = `Security Incident in ${location}`;
+        description = `Police activity reported in ${location}. Avoid the area if possible.`;
+        break;
+      case "health":
+        title = `Medical Emergency in ${location}`;
+        description = `Medical incident in ${location}. Emergency services dispatched.`;
+        break;
+      case "weather":
+        title = `Weather Warning for ${location}`;
+        description = `Heavy rainfall expected in ${location}. Take necessary precautions.`;
+        break;
+    }
+    
+    // Generate a random date within the last 24 hours
+    const date = new Date();
+    date.setHours(date.getHours() - Math.floor(Math.random() * 24));
+    
+    alerts.push({
+      id: i + 1,
+      title,
+      description,
+      location: `${location}, Chinhoyi, Zimbabwe`,
+      type,
+      severity,
+      created_at: date.toISOString(),
+      category: type,
+    });
+  }
+  
+  return alerts;
+};
+
+// Format the timestamp to relative time like "just now", "5 mins ago", etc.
+export function formatRelativeTime(timestamp: string): string {
+  try {
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffMs = now.getTime() - time.getTime();
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffSecs < 60) {
+      return "just now";
+    } else if (diffMins < 60) {
+      return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    } else if (diffDays < 30) {
+      return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    } else {
+      return time.toLocaleDateString();
+    }
+  } catch (error) {
+    console.error("Error formatting time:", error);
+    return timestamp;
+  }
+}
+
+// Add a new alert to the system
+export const addAlert = async (alert: Omit<Alert, "id" | "created_at">): Promise<Alert> => {
+  try {
+    const { data, error } = await supabase
+      .from('alerts')
+      .insert({
+        ...alert,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error("Error adding alert:", error);
+    throw error;
   }
 };
 
-export const useGetAlerts = () => {
-  const [localAlerts, setLocalAlerts] = useState<Alert[]>(alertsCache);
-
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['alerts'],
-    queryFn: async () => {
-      // Get alerts (using reports as mock)
-      const { data, error } = await getReports();
-      
-      if (error) {
-        throw new Error(error.message);
-      }
-      
-      // Convert reports to alerts
-      const alerts = data?.map(report => ({
-        ...report,
-        severity: report.severity || "medium",
-        source: report.user_id ? "user-reported" : "official"
-      })) as Alert[];
-
-      // Update our cache
-      alertsCache = alerts;
-      
-      return alerts;
-    },
-    refetchInterval: 15000, // Refetch every 15 seconds to keep data fresh
-  });
-
-  // Update local state when data changes
-  useEffect(() => {
-    if (data) {
-      setLocalAlerts(data);
-    }
-  }, [data]);
-
-  // Handle new alert subscription
-  useEffect(() => {
-    const handleNewAlert = (event: CustomEvent) => {
-      if (event.detail && event.detail.type === 'new-report') {
-        const newAlert: Alert = {
-          ...event.detail.report,
-          severity: event.detail.report.severity || "medium",
-          source: event.detail.report.user_id ? "user-reported" : "official"
-        };
-        
-        // Update local state with new alert at the top
-        setLocalAlerts(prev => {
-          // Check if already exists to prevent duplicates
-          if (prev.some(a => a.id === newAlert.id)) {
-            return prev;
-          }
-          const newAlerts = [newAlert, ...prev];
-          alertsCache = newAlerts; // Update cache
-          return newAlerts;
-        });
-      }
-    };
-
-    window.addEventListener('report-created', handleNewAlert as EventListener);
-    
-    return () => {
-      window.removeEventListener('report-created', handleNewAlert as EventListener);
-    };
-  }, []);
-
-  return {
-    data: localAlerts,
-    isLoading,
-    error,
-  };
-};
-
-export const useGetRecentAlerts = (limit = 10) => {
-  const [localAlerts, setLocalAlerts] = useState<Alert[]>([]);
-
-  const { data, isLoading, error } = useQuery({
+// Get recent alerts (defaults to 5)
+export const useGetRecentAlerts = (limit = 5) => {
+  return useQuery({
     queryKey: ['recent-alerts', limit],
     queryFn: async () => {
-      // Get alerts (using reports as mock)
-      const { data, error } = await getReports();
-      
-      if (error) {
-        throw new Error(error.message);
+      try {
+        // In a real app, fetch from the database
+        // For now, generate mock alerts specific to Chinhoyi
+        const alerts = generateChinhoyiAlerts(limit);
+        return alerts;
+      } catch (error) {
+        console.error("Error fetching recent alerts:", error);
+        throw error;
       }
-      
-      // Sort by created_at (newest first) and limit
-      const alerts = data
-        ?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        .slice(0, limit)
-        .map(report => ({
-          ...report,
-          severity: report.severity || "medium",
-          source: report.user_id ? "user-reported" : "official"
-        }));
-        
-      return alerts as Alert[];
     },
-    refetchInterval: 15000, // Refetch every 15 seconds for simulation
   });
-
-  // Update local state when data changes
-  useEffect(() => {
-    if (data) {
-      setLocalAlerts(data);
-    }
-  }, [data]);
-
-  // Handle new alert subscription
-  useEffect(() => {
-    const handleNewAlert = (event: CustomEvent) => {
-      if (event.detail && event.detail.type === 'new-report') {
-        const newAlert: Alert = {
-          ...event.detail.report,
-          severity: event.detail.report.severity || "medium",
-          source: event.detail.report.user_id ? "user-reported" : "official"
-        };
-        
-        // Add new alert to local state at the top
-        setLocalAlerts(prev => {
-          // Check if already exists to prevent duplicates
-          if (prev.some(a => a.id === newAlert.id)) {
-            return prev;
-          }
-          
-          // Keep the array limited to the specified limit
-          const newAlerts = [newAlert, ...prev];
-          if (newAlerts.length > limit) {
-            return newAlerts.slice(0, limit);
-          }
-          return newAlerts;
-        });
-
-        // Show toast notification for new alert
-        toast.info(`New Alert: ${newAlert.title}`, {
-          description: newAlert.description.substring(0, 50) + (newAlert.description.length > 50 ? '...' : ''),
-        });
-      }
-    };
-
-    window.addEventListener('report-created', handleNewAlert as EventListener);
-    
-    return () => {
-      window.removeEventListener('report-created', handleNewAlert as EventListener);
-    };
-  }, [limit]);
-
-  return {
-    data: localAlerts,
-    isLoading,
-    error,
-  };
 };
 
-export const useGetAlertById = (id: string | undefined) => {
-  const [localAlert, setLocalAlert] = useState<Alert | null>(null);
+// Get all alerts
+export const useGetAllAlerts = () => {
+  return useQuery({
+    queryKey: ['all-alerts'],
+    queryFn: async () => {
+      try {
+        // In a real app, fetch from the database
+        // For now, generate more mock alerts for Chinhoyi
+        const alerts = generateChinhoyiAlerts(15);
+        return alerts;
+      } catch (error) {
+        console.error("Error fetching all alerts:", error);
+        throw error;
+      }
+    },
+  });
+};
 
-  const { data, isLoading, error } = useQuery({
+// Get a single alert by ID
+export const useGetAlertById = (id: number | string | undefined) => {
+  return useQuery({
     queryKey: ['alert', id],
     queryFn: async () => {
       if (!id) return null;
       
-      // Get the report by ID
-      const { data, error } = await getReportById(id);
-      
-      if (error) {
-        throw new Error(error.message);
+      try {
+        // In a real app, fetch from the database
+        // For now, generate a specific mock alert for Chinhoyi
+        const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
+        const alerts = generateChinhoyiAlerts(20);
+        const alert = alerts.find(a => a.id === numericId);
+        return alert || null;
+      } catch (error) {
+        console.error(`Error fetching alert with ID ${id}:`, error);
+        throw error;
       }
-      
-      if (!data) {
-        throw new Error("Alert not found");
-      }
-      
-      return {
-        ...data,
-        severity: data.severity || "medium",
-        source: data.user_id ? "user-reported" : "official"
-      } as Alert;
     },
     enabled: !!id,
   });
+};
 
-  // Update local state when data changes
+// Subscribe to new alerts
+export const useSubscribeToAlerts = (callback: (alert: Alert) => void) => {
+  const [isSubscribed, setIsSubscribed] = useState(false);
+
   useEffect(() => {
-    if (data) {
-      setLocalAlert(data);
+    let interval: ReturnType<typeof setInterval>;
+    
+    if (!isSubscribed) {
+      // Subscribe to alerts
+      setIsSubscribed(true);
+      
+      // Simulate real-time updates by periodically generating new alerts
+      interval = setInterval(() => {
+        // 20% chance of generating a new alert every 30 seconds
+        if (Math.random() < 0.2) {
+          const newAlerts = generateChinhoyiAlerts(1);
+          if (newAlerts.length > 0) {
+            callback(newAlerts[0]);
+          }
+        }
+      }, 30000); // Every 30 seconds
     }
-  }, [data]);
-
-  // Handle alert updates
-  useEffect(() => {
-    const handleAlertUpdate = (event: CustomEvent) => {
-      if (event.detail && 
-          event.detail.type === 'update-report' && 
-          event.detail.report.id === id) {
-        setLocalAlert(prevAlert => {
-          if (!prevAlert) return null;
-          return {
-            ...prevAlert,
-            ...event.detail.report,
-            // Preserve alert-specific fields
-            severity: event.detail.report.severity || prevAlert.severity,
-            source: event.detail.report.source || prevAlert.source
-          };
-        });
-      }
-    };
-
-    window.addEventListener('report-updated', handleAlertUpdate as EventListener);
     
     return () => {
-      window.removeEventListener('report-updated', handleAlertUpdate as EventListener);
+      if (interval) clearInterval(interval);
+      setIsSubscribed(false);
     };
-  }, [id]);
-
-  return {
-    data: localAlert || data,
-    isLoading,
-    error,
-  };
-};
-
-// Separate subscription function from hook
-export const subscribeToAlerts = (callback: (alert: Alert) => void) => {
-  const handleReportCreated = (event: any) => {
-    if (event.detail && event.detail.type === 'new-report') {
-      // Convert report to alert format
-      const alert: Alert = {
-        ...event.detail.report,
-        severity: event.detail.report.severity || "medium",
-        source: event.detail.report.user_id ? "user-reported" : "official"
-      };
-      callback(alert);
-    }
-  };
-
-  window.addEventListener('report-created', handleReportCreated);
-  
-  // Return cleanup function
-  return () => {
-    window.removeEventListener('report-created', handleReportCreated);
-  };
-};
-
-// Hook that uses the subscribe function
-export const useSubscribeToAlerts = (callback: (alert: Alert) => void) => {
-  useEffect(() => {
-    const unsubscribe = subscribeToAlerts(callback);
-    return unsubscribe;
-  }, [callback]);
-};
-
-// Format timestamp relative to current time
-export const formatRelativeTime = (timestamp: string): string => {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-  
-  if (diffMins < 1) {
-    return "Just now";
-  } else if (diffMins < 60) {
-    return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`;
-  } else if (diffHours < 24) {
-    return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
-  } else if (diffDays < 7) {
-    return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
-  } else {
-    return date.toLocaleDateString();
-  }
+  }, [callback, isSubscribed]);
 };

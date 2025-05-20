@@ -1,38 +1,41 @@
 
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Toaster as SonnerToaster } from "sonner";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { NavigationProvider } from "@/contexts/NavigationContext";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+// Layouts
+import AppLayout from "@/layouts/AppLayout";
+import AuthLayout from "@/layouts/AuthLayout";
 
 // Pages
-import SplashScreen from "./pages/SplashScreen";
-import Onboarding from "./pages/Onboarding";
-import SignIn from "./pages/SignIn";
-import SignUp from "./pages/SignUp";
-import ForgotPassword from "./pages/ForgotPassword";
-import FillProfile from "./pages/FillProfile";
-import MainLayoutAuthWrapper from "./components/layouts/MainLayoutAuthWrapper";
-import Home from "./pages/Home";
-import Alerts from "./pages/Alerts";
-import AlertDetail from "./pages/AlertDetail";
-import Resources from "./pages/Resources";
-import ResourceDetail from "./pages/ResourceDetail";
-import Contacts from "./pages/Contacts";
-import Profile from "./pages/Profile";
-import PersonalInfo from "./pages/profile/PersonalInfo"; 
-import EmergencyContacts from "./pages/profile/EmergencyContacts";
-import MedicalInfo from "./pages/profile/MedicalInfo";
-import SavedResources from "./pages/profile/SavedResources";
-import Settings from "./pages/Settings";
-import Chat from "./pages/Chat";
-import NotFound from "./pages/NotFound";
-import EnhancedProfile from "./pages/EnhancedProfile";
-import Nearby from "./pages/Nearby";
-import ReportIncident from "./pages/ReportIncident";
+import Home from "@/pages/Home";
+import Alerts from "@/pages/Alerts";
+import AlertDetail from "@/pages/AlertDetail";
+import Report from "@/pages/Report";
+import Contacts from "@/pages/Contacts";
+import Resources from "@/pages/Resources";
+import ResourceDetail from "@/pages/ResourceDetail";
+import Chat from "@/pages/Chat";
+import Profile from "@/pages/Profile";
+import Settings from "@/pages/Settings";
+import SignIn from "@/pages/SignIn";
+import SignUp from "@/pages/SignUp";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
+import FillProfile from "@/pages/FillProfile";
+import Onboarding from "@/pages/Onboarding";
+import Nearby from "@/pages/Nearby";
+import Map from "@/pages/Map";
 
+// Protecting routes
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import OnboardingCheck from "@/components/auth/OnboardingCheck";
+
+// Create React Query client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -44,49 +47,63 @@ const queryClient = new QueryClient({
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <TooltipProvider>
-          <Router>
-            <AuthProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <NavigationProvider>
+            <Router>
               <Routes>
-                {/* Public routes */}
-                <Route path="/" element={<SplashScreen />} />
-                <Route path="/onboarding" element={<Onboarding />} />
-                <Route path="/signin" element={<SignIn />} />
-                <Route path="/signup" element={<SignUp />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route path="/fill-profile" element={<FillProfile />} />
-                
-                {/* Protected routes */}
-                <Route path="/app" element={<MainLayoutAuthWrapper />}>
+                {/* Auth Routes */}
+                <Route path="/" element={<AuthLayout />}>
+                  <Route index element={<Navigate to="/signin" replace />} />
+                  <Route path="signin" element={<SignIn />} />
+                  <Route path="signup" element={<SignUp />} />
+                  <Route path="forgot-password" element={<ForgotPassword />} />
+                  <Route path="reset-password" element={<ResetPassword />} />
+                  <Route path="fill-profile" element={<FillProfile />} />
+                </Route>
+
+                {/* Onboarding */}
+                <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
+
+                {/* App Routes - Protected */}
+                <Route
+                  path="/app"
+                  element={
+                    <ProtectedRoute>
+                      <OnboardingCheck>
+                        <AppLayout />
+                      </OnboardingCheck>
+                    </ProtectedRoute>
+                  }
+                >
                   <Route index element={<Home />} />
                   <Route path="alerts" element={<Alerts />} />
                   <Route path="alerts/:id" element={<AlertDetail />} />
+                  <Route path="report" element={<Report />} />
+                  <Route path="contacts" element={<Contacts />} />
                   <Route path="resources" element={<Resources />} />
                   <Route path="resources/:id" element={<ResourceDetail />} />
-                  <Route path="resources/saved" element={<SavedResources />} />
-                  <Route path="contacts" element={<Contacts />} />
-                  <Route path="profile" element={<Profile />} />
-                  <Route path="profile/personal" element={<PersonalInfo />} />
-                  <Route path="profile/emergency" element={<EmergencyContacts />} />
-                  <Route path="profile/medical" element={<MedicalInfo />} />
-                  <Route path="settings" element={<Settings />} />
                   <Route path="chat" element={<Chat />} />
+                  <Route path="chat/:id" element={<Chat />} />
+                  <Route path="profile" element={<Profile />} />
+                  <Route path="settings" element={<Settings />} />
                   <Route path="nearby" element={<Nearby />} />
-                  <Route path="report" element={<ReportIncident />} />
+                  <Route path="map" element={<Map />} />
                 </Route>
-                
-                {/* 404 route */}
-                <Route path="*" element={<NotFound />} />
+
+                {/* Fallback route */}
+                <Route path="*" element={<Navigate to="/app" replace />} />
               </Routes>
-            </AuthProvider>
-          </Router>
+            </Router>
+          </NavigationProvider>
+
+          {/* Toasts */}
           <Toaster />
-          <Sonner />
-        </TooltipProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+          <SonnerToaster position="top-center" />
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 

@@ -1,6 +1,7 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, MapPin, FileText, Phone, MessageCircle, Shield, AlertTriangle, Cloud, CloudRain, CloudLightning, Info } from "lucide-react";
+import { Bell, MapPin, FileText, Phone, MessageCircle, Shield, AlertTriangle, Cloud, CloudRain, CloudLightning, Info, Map } from "lucide-react";
 import QuickAction from "@/components/common/QuickAction";
 import AlertCard from "@/components/common/AlertCard";
 import { toast } from "@/components/ui/use-toast";
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfileData } from "@/hooks/use-profile-data";
 import { useGetRecentAlerts, useSubscribeToAlerts, Alert } from "@/services/alertsService";
+import LocationMap from "@/components/common/LocationMap";
 
 const Home = () => {
   const { user } = useAuth();
@@ -57,7 +59,7 @@ const Home = () => {
   useSubscribeToAlerts(handleNewAlert);
 
   // Mock user location for sharing
-  const userLocation = "37.7749,-122.4194"; // San Francisco coordinates
+  const userLocation = "Chinhoyi, Zimbabwe"; 
 
   const handleSafetyCheck = () => {
     setMarkSafeOpen(true);
@@ -88,7 +90,7 @@ const Home = () => {
     { icon: MapPin, label: "Nearby", color: "text-crisis-blue", onClick: () => navigate("/app/nearby") },
     { icon: AlertTriangle, label: "Report", color: "text-crisis-red", onClick: () => navigate("/app/report") },
     { icon: FileText, label: "Guides", color: "text-primary", onClick: () => navigate("/app/resources") },
-    { icon: Phone, label: "Contacts", color: "text-crisis-purple", onClick: () => navigate("/app/contacts") },
+    { icon: Map, label: "Map", color: "text-crisis-purple", onClick: () => navigate("/app/map") },
     { icon: MessageCircle, label: "Chat", color: "text-crisis-darkBlue", onClick: () => navigate("/app/chat") },
   ];
 
@@ -164,7 +166,7 @@ const Home = () => {
                 title={alert.title}
                 message={alert.description}
                 severity={alert.severity}
-                time={new Date(alert.created_at).toLocaleString()}
+                time={alert.created_at}
                 icon={getAlertIcon(alert.type)}
                 location={alert.location}
                 category={alert.type}
@@ -177,6 +179,18 @@ const Home = () => {
             <p className="text-muted-foreground">No recent alerts</p>
           </div>
         )}
+      </div>
+
+      <div className="mb-8">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="font-semibold">Emergency Map</h2>
+        </div>
+        <div className="rounded-lg overflow-hidden border border-border h-48">
+          <LocationMap location="Chinhoyi, Zimbabwe" className="w-full h-full" />
+        </div>
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          Map showing emergency services in Chinhoyi, Zimbabwe
+        </p>
       </div>
       
       <Dialog open={markSafeOpen} onOpenChange={setMarkSafeOpen}>

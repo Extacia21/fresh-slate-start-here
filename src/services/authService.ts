@@ -14,6 +14,7 @@ export interface AuthResponse {
   success: boolean;
   message?: string;
   user?: any;
+  needsEmailConfirmation?: boolean;
 }
 
 const authService = {
@@ -61,13 +62,15 @@ const authService = {
   
   signUp: async ({ email, password, name }: SignUpData): Promise<AuthResponse> => {
     try {
+      // Configure the sign-up options to brand emails as Crisis Connect
       const { data, error } = await supabase.auth.signUp({ 
         email, 
         password,
         options: {
           data: {
             full_name: name,
-          }
+          },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         }
       });
       
@@ -78,9 +81,19 @@ const authService = {
         };
       }
       
+      let needsEmailConfirmation = false;
+      
+      // Check if the identities array is empty or undefined, which indicates 
+      // the user needs to confirm their email
+      if (!data.user?.identities || data.user.identities.length === 0 || 
+          data.user.email_confirmed_at === null) {
+        needsEmailConfirmation = true;
+      }
+      
       return { 
         success: true,
         user: data.user,
+        needsEmailConfirmation,
         message: data.user?.identities?.length === 0 ? 
           "This email is already registered. Please sign in instead." : 
           "Account created successfully. Please check your email for confirmation."
@@ -99,7 +112,9 @@ const authService = {
   
   resetPassword: async (email: string): Promise<AuthResponse> => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
       
       if (error) {
         return {
