@@ -17,7 +17,8 @@ const Report = () => {
       </div>
 
       <div className="py-4">
-        <ReportForm />
+        {/* Make sure we're passing any required props to ReportForm */}
+        <ReportForm defaultLocation="Chinhoyi, Zimbabwe" />
       </div>
     </div>
   );

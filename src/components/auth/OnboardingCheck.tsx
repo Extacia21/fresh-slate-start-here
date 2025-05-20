@@ -1,3 +1,4 @@
+
 import React, { ReactNode, useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,14 +24,14 @@ const OnboardingCheck = ({ children }: OnboardingCheckProps) => {
         // Check if user has completed onboarding
         const { data: profile, error } = await supabase
           .from("profiles")
-          .select("has_completed_onboarding")
+          .select("onboarding_completed")
           .eq("id", user.id)
           .single();
 
         if (error) throw error;
 
         // Set onboarding status
-        setHasCompletedOnboarding(profile?.has_completed_onboarding || false);
+        setHasCompletedOnboarding(profile?.onboarding_completed || false);
       } catch (error) {
         console.error("Error checking onboarding status:", error);
         // Default to false if there's an error

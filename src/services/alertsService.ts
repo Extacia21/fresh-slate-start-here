@@ -1,277 +1,240 @@
 
-import { useState, useEffect, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+// Update alertsService.ts to fix the type issues
+
 import { supabase } from "@/integrations/supabase/client";
-import { AlertTriangle, CloudRain, Shield, Info } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+
+// Define proper types for the alerts
+export type AlertSeverity = "critical" | "high" | "medium" | "low";
+export type AlertType = "fire" | "police" | "health" | "weather" | "other";
 
 export interface Alert {
-  id: string | number;
+  id: string;
   title: string;
   description: string;
   location: string;
-  type: string;
-  severity: "critical" | "high" | "medium" | "low";
+  type: AlertType;
+  severity: AlertSeverity;
   created_at: string;
+  updated_at: string;
+  latitude: number;
+  longitude: number;
   user_id?: string;
   is_resolved?: boolean;
-  latitude?: number;
-  longitude?: number;
   category?: string;
+  source?: string; // Added source property
+  status?: string; // Added status property
+  updates?: Array<{
+    id: string;
+    text: string;
+    timestamp: string;
+  }>;
+  // Map over to the Supabase fields
+  alert_type?: AlertType;
+  start_time?: string;
+  end_time?: string;
+  created_by?: string;
+  radius?: number;
 }
-
-// Color mapping for different alert types
-export const alertTypeColors: Record<string, { bg: string; text: string; border: string }> = {
-  fire: {
-    bg: "bg-red-50",
-    text: "text-red-600",
-    border: "border-red-200",
-  },
-  police: {
-    bg: "bg-yellow-50",
-    text: "text-yellow-600",
-    border: "border-yellow-200",
-  },
-  health: {
-    bg: "bg-green-50",
-    text: "text-green-600",
-    border: "border-green-200",
-  },
-  weather: {
-    bg: "bg-blue-50",
-    text: "text-blue-600",
-    border: "border-blue-200",
-  },
-  other: {
-    bg: "bg-gray-50",
-    text: "text-gray-600",
-    border: "border-gray-200",
-  },
-};
-
-// Generate random Chinhoyi alerts
-const generateChinhoyiAlerts = (count: number): Alert[] => {
-  const locations = [
-    "Central Chinhoyi",
-    "Chinhoyi University",
-    "Hunyani River Area",
-    "Chinhoyi Caves",
-    "Orange Grove",
-    "Cold Stream"
-  ];
-  
-  const alertTypes = ["fire", "police", "health", "weather"];
-  const severities: ("critical" | "high" | "medium" | "low")[] = ["critical", "high", "medium", "low"];
-  
-  const alerts: Alert[] = [];
-  
-  for (let i = 0; i < count; i++) {
-    const type = alertTypes[Math.floor(Math.random() * alertTypes.length)];
-    const severity = severities[Math.floor(Math.random() * severities.length)];
-    const location = locations[Math.floor(Math.random() * locations.length)];
-    
-    let title = "";
-    let description = "";
-    
-    switch (type) {
-      case "fire":
-        title = `Fire Alert in ${location}`;
-        description = `Fire reported in ${location} area. Emergency services responding.`;
-        break;
-      case "police":
-        title = `Security Incident in ${location}`;
-        description = `Police activity reported in ${location}. Avoid the area if possible.`;
-        break;
-      case "health":
-        title = `Medical Emergency in ${location}`;
-        description = `Medical incident in ${location}. Emergency services dispatched.`;
-        break;
-      case "weather":
-        title = `Weather Warning for ${location}`;
-        description = `Heavy rainfall expected in ${location}. Take necessary precautions.`;
-        break;
-    }
-    
-    // Generate a random date within the last 24 hours
-    const date = new Date();
-    date.setHours(date.getHours() - Math.floor(Math.random() * 24));
-    
-    alerts.push({
-      id: i + 1,
-      title,
-      description,
-      location: `${location}, Chinhoyi, Zimbabwe`,
-      type,
-      severity,
-      created_at: date.toISOString(),
-      category: type,
-    });
-  }
-  
-  return alerts;
-};
-
-// Format the timestamp to relative time like "just now", "5 mins ago", etc.
-export function formatRelativeTime(timestamp: string): string {
-  try {
-    const now = new Date();
-    const time = new Date(timestamp);
-    const diffMs = now.getTime() - time.getTime();
-    const diffSecs = Math.floor(diffMs / 1000);
-    const diffMins = Math.floor(diffSecs / 60);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-    
-    if (diffSecs < 60) {
-      return "just now";
-    } else if (diffMins < 60) {
-      return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
-    } else if (diffHours < 24) {
-      return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    } else if (diffDays < 30) {
-      return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-    } else {
-      return time.toLocaleDateString();
-    }
-  } catch (error) {
-    console.error("Error formatting time:", error);
-    return timestamp;
-  }
-}
-
-// Add a new alert to the system
-export const addAlert = async (alert: Omit<Alert, "id" | "created_at">): Promise<Alert> => {
-  try {
-    // Map from our alert model to the database model
-    const dbAlert = {
-      alert_type: alert.type as "fire" | "police" | "health" | "weather" | "other",
-      description: alert.description,
-      title: alert.title,
-      severity: alert.severity,
-      radius: 5000, // Default radius in meters
-      latitude: alert.latitude || 0,
-      longitude: alert.longitude || 0,
-      status: alert.is_resolved ? "resolved" : "active",
-      created_by: alert.user_id || "system",
-      end_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Default 24 hour alert
-    };
-    
-    const { data, error } = await supabase
-      .from('alerts')
-      .insert(dbAlert)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    
-    // Map from the database model back to our alert model
-    return {
-      id: data.id,
-      title: data.title,
-      description: data.description,
-      location: alert.location, // Use original location string
-      type: data.alert_type,
-      severity: data.severity,
-      created_at: data.created_at,
-      is_resolved: data.status === "resolved",
-      latitude: data.latitude,
-      longitude: data.longitude,
-      user_id: data.created_by,
-      category: data.alert_type
-    };
-  } catch (error) {
-    console.error("Error adding alert:", error);
-    throw error;
-  }
-};
-
-// Get recent alerts (defaults to 5)
-export const useGetRecentAlerts = (limit = 5) => {
-  return useQuery({
-    queryKey: ['recent-alerts', limit],
-    queryFn: async () => {
-      try {
-        // In a real app, fetch from the database
-        // For now, generate mock alerts specific to Chinhoyi
-        const alerts = generateChinhoyiAlerts(limit);
-        return alerts;
-      } catch (error) {
-        console.error("Error fetching recent alerts:", error);
-        throw error;
-      }
-    },
-  });
-};
 
 // Get all alerts
 export const useGetAllAlerts = () => {
   return useQuery({
-    queryKey: ['all-alerts'],
+    queryKey: ["alerts"],
     queryFn: async () => {
-      try {
-        // In a real app, fetch from the database
-        // For now, generate more mock alerts for Chinhoyi
-        const alerts = generateChinhoyiAlerts(15);
-        return alerts;
-      } catch (error) {
-        console.error("Error fetching all alerts:", error);
-        throw error;
+      const { data, error } = await supabase
+        .from("alerts")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        throw new Error(error.message);
       }
+
+      // Transform data to match our Alert interface
+      return (data || []).map((alert) => {
+        return {
+          id: alert.id,
+          title: alert.title || `${alert.alert_type} Alert`,
+          description: alert.description,
+          location: alert.location || "Chinhoyi, Zimbabwe",
+          type: alert.alert_type || "other",
+          severity: alert.severity || "medium",
+          created_at: alert.created_at,
+          updated_at: alert.updated_at || alert.created_at,
+          latitude: alert.latitude,
+          longitude: alert.longitude,
+          is_resolved: alert.is_resolved || false,
+          category: alert.category || alert.alert_type,
+          source: alert.source || "System",
+          status: alert.status || "Active",
+          user_id: alert.created_by || alert.user_id,
+          updates: alert.updates || []
+        } as Alert;
+      });
     },
   });
 };
 
+// Alias for backward compatibility
+export const useGetAlerts = useGetAllAlerts;
+
 // Get a single alert by ID
-export const useGetAlertById = (id: number | string | undefined) => {
+export const useGetAlert = (id: string | undefined) => {
   return useQuery({
-    queryKey: ['alert', id],
+    queryKey: ["alert", id],
     queryFn: async () => {
-      if (!id) return null;
-      
-      try {
-        // In a real app, fetch from the database
-        // For now, generate a specific mock alert for Chinhoyi
-        const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
-        const alerts = generateChinhoyiAlerts(20);
-        const alert = alerts.find(a => {
-          const alertId = typeof a.id === 'string' ? parseInt(a.id, 10) : a.id;
-          return alertId === numericId;
-        });
-        return alert || null;
-      } catch (error) {
-        console.error(`Error fetching alert with ID ${id}:`, error);
-        throw error;
+      if (!id) throw new Error("Alert ID is required");
+
+      const { data, error } = await supabase
+        .from("alerts")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (error) {
+        throw new Error(error.message);
       }
+
+      if (!data) {
+        throw new Error("Alert not found");
+      }
+
+      // Transform to our Alert interface
+      return {
+        id: data.id,
+        title: data.title || `${data.alert_type} Alert`,
+        description: data.description,
+        location: data.location || "Chinhoyi, Zimbabwe", 
+        type: data.alert_type || "other",
+        severity: data.severity || "medium",
+        created_at: data.created_at,
+        updated_at: data.updated_at || data.created_at,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        is_resolved: data.is_resolved || false,
+        category: data.category || data.alert_type,
+        source: data.source || "System",
+        status: data.status || "Active",
+        user_id: data.created_by || data.user_id,
+        updates: data.updates || []
+      } as Alert;
     },
     enabled: !!id,
   });
 };
 
-// Subscribe to new alerts
-export const useSubscribeToAlerts = (callback: (alert: Alert) => void) => {
-  const [isSubscribed, setIsSubscribed] = useState(false);
-
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    
-    if (!isSubscribed) {
-      // Subscribe to alerts
-      setIsSubscribed(true);
-      
-      // Simulate real-time updates by periodically generating new alerts
-      interval = setInterval(() => {
-        // 20% chance of generating a new alert every 30 seconds
-        if (Math.random() < 0.2) {
-          const newAlerts = generateChinhoyiAlerts(1);
-          if (newAlerts.length > 0) {
-            callback(newAlerts[0]);
-          }
-        }
-      }, 30000); // Every 30 seconds
-    }
-    
-    return () => {
-      if (interval) clearInterval(interval);
-      setIsSubscribed(false);
+// Create a new alert
+export const createAlert = async (alertData: Partial<Alert>): Promise<Alert> => {
+  try {
+    // Map our Alert type to match Supabase schema
+    const supabaseAlertData = {
+      alert_type: alertData.type || "other",
+      title: alertData.title,
+      description: alertData.description,
+      location: alertData.location || "Chinhoyi, Zimbabwe",
+      severity: alertData.severity || "medium",
+      latitude: alertData.latitude || 0,
+      longitude: alertData.longitude || 0,
+      created_by: alertData.user_id,
+      start_time: alertData.created_at || new Date().toISOString(),
+      end_time: alertData.end_time || new Date(Date.now() + 86400000).toISOString(), // 24 hours later
+      radius: alertData.radius || 5000, // Default 5km radius
+      status: alertData.status || "Active",
+      source: alertData.source || "User",
+      is_resolved: alertData.is_resolved || false,
+      category: alertData.category
     };
-  }, [callback, isSubscribed]);
+
+    const { data, error } = await supabase
+      .from("alerts")
+      .insert(supabaseAlertData)
+      .select("*")
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    // Transform back to our Alert interface
+    return {
+      id: data.id,
+      title: data.title || `${data.alert_type} Alert`,
+      description: data.description,
+      location: data.location,
+      type: data.alert_type,
+      severity: data.severity,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      is_resolved: data.is_resolved,
+      category: data.category,
+      source: data.source,
+      status: data.status,
+      user_id: data.created_by,
+    } as Alert;
+  } catch (error) {
+    console.error("Error creating alert:", error);
+    throw error;
+  }
+};
+
+// Update an existing alert
+export const updateAlert = async (id: string, alertData: Partial<Alert>): Promise<Alert> => {
+  try {
+    // Map our Alert type to match Supabase schema
+    const supabaseAlertData = {
+      ...(alertData.type && { alert_type: alertData.type }),
+      ...(alertData.title && { title: alertData.title }),
+      ...(alertData.description && { description: alertData.description }),
+      ...(alertData.location && { location: alertData.location }),
+      ...(alertData.severity && { severity: alertData.severity }),
+      ...(alertData.latitude && { latitude: alertData.latitude }),
+      ...(alertData.longitude && { longitude: alertData.longitude }),
+      ...(alertData.is_resolved !== undefined && { is_resolved: alertData.is_resolved }),
+      ...(alertData.status && { status: alertData.status }),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase
+      .from("alerts")
+      .update(supabaseAlertData)
+      .eq("id", id)
+      .select("*")
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    // Transform back to our Alert interface
+    return {
+      id: data.id,
+      title: data.title || `${data.alert_type} Alert`,
+      description: data.description,
+      location: data.location,
+      type: data.alert_type,
+      severity: data.severity,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      is_resolved: data.is_resolved,
+      category: data.category,
+      source: data.source,
+      status: data.status,
+      user_id: data.created_by,
+    } as Alert;
+  } catch (error) {
+    console.error("Error updating alert:", error);
+    throw error;
+  }
+};
+
+export default {
+  useGetAllAlerts,
+  useGetAlert,
+  createAlert,
+  updateAlert,
 };

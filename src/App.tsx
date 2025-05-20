@@ -49,9 +49,9 @@ function App() {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <NavigationProvider>
-            <Router>
+        <Router>
+          <AuthProvider>
+            <NavigationProvider>
               <Routes>
                 {/* Auth Routes */}
                 <Route path="/" element={<AuthLayout />}>
@@ -95,13 +95,13 @@ function App() {
                 {/* Fallback route */}
                 <Route path="*" element={<Navigate to="/app" replace />} />
               </Routes>
-            </Router>
-          </NavigationProvider>
+            </NavigationProvider>
 
-          {/* Toasts */}
-          <Toaster />
-          <SonnerToaster position="top-center" />
-        </AuthProvider>
+            {/* Toasts */}
+            <Toaster />
+            <SonnerToaster position="top-center" />
+          </AuthProvider>
+        </Router>
       </QueryClientProvider>
     </ThemeProvider>
   );
