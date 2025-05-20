@@ -33,7 +33,11 @@ const Report = () => {
         </div>
       </div>
 
-      <ReportForm />
+      <Button className="w-full" asChild>
+        <ReportForm>
+          Report an Incident
+        </ReportForm>
+      </Button>
     </div>
   );
 };

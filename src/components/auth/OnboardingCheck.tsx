@@ -7,6 +7,12 @@ interface OnboardingCheckProps {
   children: React.ReactNode;
 }
 
+// Define a profile interface that includes the properties we need
+interface Profile {
+  id: string;
+  is_onboarded?: boolean;
+}
+
 const OnboardingCheck = ({ children }: OnboardingCheckProps) => {
   const [loading, setLoading] = useState(true);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
@@ -22,15 +28,15 @@ const OnboardingCheck = ({ children }: OnboardingCheckProps) => {
           return;
         }
 
-        // Check if user has completed onboarding
+        // Check if user has completed onboarding by checking if first_name exists
         const { data, error } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", userData.user.id)
           .single();
 
-        // If profile doesn't exist or onboarding is not completed, redirect to onboarding
-        if (error || !data || data.is_onboarded !== true) {
+        // If profile doesn't exist or doesn't have a first_name, redirect to onboarding
+        if (error || !data || !data.first_name) {
           setNeedsOnboarding(true);
         }
       } catch (error) {

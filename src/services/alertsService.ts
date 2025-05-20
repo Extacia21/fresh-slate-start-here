@@ -20,7 +20,7 @@ export interface Alert {
   created_at: string;
   updated_at: string;
   created_by: string;
-  // Additional properties
+  // These fields may not be in the database but we add them to our interface
   status?: string;
   is_resolved?: boolean;
   category?: string;
@@ -78,7 +78,7 @@ export const formatRelativeTime = (dateString: string): string => {
   }
 };
 
-// Get all alerts (renamed from useGetAlerts to useGetAllAlerts to match usage)
+// Get all alerts
 export const useGetAllAlerts = () => {
   return useQuery({
     queryKey: ["alerts"],
@@ -95,12 +95,12 @@ export const useGetAllAlerts = () => {
       return (data || []).map(alert => ({
         ...alert,
         type: alert.alert_type, // Add type property that matches alert_type for compatibility
-        location: alert.location || `${alert.latitude.toFixed(6)}, ${alert.longitude.toFixed(6)}`,
-        status: alert.status || "active",
-        is_resolved: alert.is_resolved || false,
-        category: alert.category || alert.alert_type,
-        user_id: alert.user_id || alert.created_by,
-        updates: alert.updates || []
+        location: `${alert.latitude.toFixed(6)}, ${alert.longitude.toFixed(6)}`,
+        status: "active",
+        is_resolved: false,
+        category: alert.alert_type,
+        user_id: alert.created_by,
+        updates: []
       })) as Alert[];
     },
   });
@@ -127,12 +127,12 @@ export const useGetAlertById = (id: string) => {
       return {
         ...data,
         type: data.alert_type, // Add type property that matches alert_type for compatibility
-        location: data.location || `${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}`,
-        status: data.status || "active",
-        is_resolved: data.is_resolved || false,
-        category: data.category || data.alert_type,
-        user_id: data.user_id || data.created_by,
-        updates: data.updates || []
+        location: `${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}`,
+        status: "active",
+        is_resolved: false,
+        category: data.alert_type,
+        user_id: data.created_by,
+        updates: []
       } as Alert;
     },
     enabled: !!id,
@@ -161,12 +161,12 @@ export const useGetRecentAlerts = () => {
       return (data || []).map(alert => ({
         ...alert,
         type: alert.alert_type, // Add type property that matches alert_type for compatibility
-        location: alert.location || `${alert.latitude.toFixed(6)}, ${alert.longitude.toFixed(6)}`,
-        status: alert.status || "active",
-        is_resolved: alert.is_resolved || false,
-        category: alert.category || alert.alert_type,
-        user_id: alert.user_id || alert.created_by,
-        updates: alert.updates || []
+        location: `${alert.latitude.toFixed(6)}, ${alert.longitude.toFixed(6)}`,
+        status: "active",
+        is_resolved: false,
+        category: alert.alert_type,
+        user_id: alert.created_by,
+        updates: []
       })) as Alert[];
     },
   });
@@ -202,6 +202,12 @@ export const useCreateAlert = () => {
       return {
         ...data,
         type: data.alert_type, // Add type property that matches alert_type for compatibility
+        location: `${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}`,
+        status: "active",
+        is_resolved: false,
+        category: data.alert_type,
+        user_id: data.created_by,
+        updates: []
       } as Alert;
     },
     onSuccess: () => {
@@ -232,12 +238,12 @@ export const useSubscribeToAlerts = (callback: (alerts: Alert[] | Alert) => void
             const alerts = data.map(alert => ({
               ...alert,
               type: alert.alert_type, // Add type property that matches alert_type for compatibility
-              location: alert.location || `${alert.latitude.toFixed(6)}, ${alert.longitude.toFixed(6)}`,
-              status: alert.status || "active",
-              is_resolved: alert.is_resolved || false,
-              category: alert.category || alert.alert_type,
-              user_id: alert.user_id || alert.created_by,
-              updates: alert.updates || []
+              location: `${alert.latitude.toFixed(6)}, ${alert.longitude.toFixed(6)}`,
+              status: "active",
+              is_resolved: false,
+              category: alert.alert_type,
+              user_id: alert.created_by,
+              updates: []
             })) as Alert[];
             
             // Call the callback with the latest alerts
@@ -273,12 +279,12 @@ export const useGetAlertsByType = (type: AlertType) => {
       return data.map(alert => ({
         ...alert,
         type: alert.alert_type, // Add type property that matches alert_type for compatibility
-        location: alert.location || `${alert.latitude.toFixed(6)}, ${alert.longitude.toFixed(6)}`,
-        status: alert.status || "active",
-        is_resolved: alert.is_resolved || false,
-        category: alert.category || alert.alert_type,
-        user_id: alert.user_id || alert.created_by,
-        updates: alert.updates || []
+        location: `${alert.latitude.toFixed(6)}, ${alert.longitude.toFixed(6)}`,
+        status: "active",
+        is_resolved: false,
+        category: alert.alert_type,
+        user_id: alert.created_by,
+        updates: []
       })) as Alert[];
     },
   });
