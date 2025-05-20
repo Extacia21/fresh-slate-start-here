@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { User, Shield, Settings, ChevronRight, LogOut, MapPin, Phone, Droplet, Heart, Bell } from "lucide-react";
@@ -49,13 +50,18 @@ const Profile = () => {
                   user?.email?.split('@')[0] || 
                   'User');
       
+      // Convert allergies to array if it's a string
+      const allergiesArray = Array.isArray(profileData.allergies) 
+        ? profileData.allergies 
+        : (profileData.allergies ? profileData.allergies.split(',') : []);
+      
       setUserProfile({
         name: name,
         location: profileData.city ? `${profileData.city}, ${profileData.state || ''}`.trim() : 'No location set',
         phone: profileData.phone || 'No phone set',
         email: user?.email || 'No email set',
         bloodType: "",
-        allergies: profileData.allergies ? profileData.allergies.split(',') : [],
+        allergies: allergiesArray,
         emergencyContacts: [],
       });
       

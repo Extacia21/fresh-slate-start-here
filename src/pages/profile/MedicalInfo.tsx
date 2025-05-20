@@ -42,16 +42,21 @@ const MedicalInfo = () => {
 
   useEffect(() => {
     if (profileData) {
-      // Parse allergies from comma-separated string to array
-      const allergiesArray = profileData.allergies
-        ? profileData.allergies.split(",").filter(Boolean)
-        : [];
+      // Parse allergies from string or array
+      const allergiesArray = Array.isArray(profileData.allergies) 
+        ? profileData.allergies 
+        : (profileData.allergies ? profileData.allergies.split(",").filter(Boolean) : []);
+      
       setAllergies(allergiesArray);
       
       form.reset({
         bloodType: profileData.blood_type || "",
-        medicalConditions: profileData.medical_conditions || "",
-        medications: profileData.medications || "",
+        medicalConditions: typeof profileData.medical_conditions === 'string' 
+          ? profileData.medical_conditions 
+          : (profileData.medical_conditions || []).join(","),
+        medications: typeof profileData.medications === 'string'
+          ? profileData.medications
+          : (profileData.medications || []).join(","),
         emergencyNotes: profileData.emergency_notes || "",
         newAllergy: "",
       });
