@@ -34,6 +34,7 @@ import Map from "@/pages/Map";
 // Protecting routes
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import OnboardingCheck from "@/components/auth/OnboardingCheck";
+import MainLayoutAuthWrapper from "@/components/layouts/MainLayoutAuthWrapper";
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -53,9 +54,14 @@ function App() {
           <AuthProvider>
             <NavigationProvider>
               <Routes>
+                {/* Root route redirects to onboarding or signin based on localStorage flag */}
+                <Route path="/" element={<Navigate to="/onboarding" replace />} />
+                
+                {/* Onboarding */}
+                <Route path="/onboarding" element={<Onboarding />} />
+                
                 {/* Auth Routes */}
                 <Route path="/" element={<AuthLayout />}>
-                  <Route index element={<Navigate to="/signin" replace />} />
                   <Route path="signin" element={<SignIn />} />
                   <Route path="signup" element={<SignUp />} />
                   <Route path="forgot-password" element={<ForgotPassword />} />
@@ -63,19 +69,10 @@ function App() {
                   <Route path="fill-profile" element={<FillProfile />} />
                 </Route>
 
-                {/* Onboarding */}
-                <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
-
                 {/* App Routes - Protected */}
                 <Route
                   path="/app"
-                  element={
-                    <ProtectedRoute>
-                      <OnboardingCheck>
-                        <AppLayout />
-                      </OnboardingCheck>
-                    </ProtectedRoute>
-                  }
+                  element={<MainLayoutAuthWrapper />}
                 >
                   <Route index element={<Home />} />
                   <Route path="alerts" element={<Alerts />} />
@@ -93,7 +90,7 @@ function App() {
                 </Route>
 
                 {/* Fallback route */}
-                <Route path="*" element={<Navigate to="/app" replace />} />
+                <Route path="*" element={<Navigate to="/onboarding" replace />} />
               </Routes>
             </NavigationProvider>
 

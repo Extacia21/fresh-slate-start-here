@@ -1,10 +1,19 @@
 
-import React from "react";
-import { Outlet, Navigate } from "react-router-dom";
+import React, { useEffect } from "react";
+import { Outlet, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
 const AuthLayout = () => {
   const { user, isLoading } = useAuth();
+  const navigate = useNavigate();
+  
+  // Check if onboarding has been completed
+  useEffect(() => {
+    const hasSeenOnboarding = localStorage.getItem("hasSeenOnboarding");
+    if (hasSeenOnboarding !== "true") {
+      navigate("/onboarding");
+    }
+  }, [navigate]);
 
   // Show loading state while checking authentication
   if (isLoading) {

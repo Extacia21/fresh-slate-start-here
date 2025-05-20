@@ -19,6 +19,13 @@ const OnboardingCheck = ({ children }: OnboardingCheckProps) => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // First check if the user has seen the app onboarding
+    const hasSeenOnboarding = localStorage.getItem("hasSeenOnboarding") === "true";
+    if (!hasSeenOnboarding) {
+      navigate("/onboarding");
+      return;
+    }
+
     async function checkOnboardingStatus() {
       try {
         // Get current user
