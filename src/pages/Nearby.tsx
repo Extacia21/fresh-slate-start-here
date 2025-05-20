@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { ArrowLeft, Building, Heart, MapPin, Navigation, Phone, Search, Shield } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -7,78 +6,51 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import LocationMap from "@/components/common/LocationMap";
 import { toast } from "sonner";
 
-// Mock nearby locations for Chinhoyi, Zimbabwe
-const chinhoyiLocations = [
+// Mock nearby locations
+const mockLocations = [
   {
     id: 1,
-    name: "Chinhoyi Provincial Hospital",
+    name: "City Hospital",
     category: "hospital",
-    distance: "1.2 miles",
-    address: "Magamba Way, Chinhoyi, Zimbabwe",
-    phone: "+263 67 22260",
+    distance: "0.8 miles",
+    address: "123 Main Street, Downtown",
+    phone: "(555) 123-4567",
     icon: Heart
   },
   {
     id: 2,
-    name: "Zimbabwe Republic Police (Chinhoyi)",
+    name: "Police Station",
     category: "police",
-    distance: "0.8 miles",
-    address: "Chinhoyi Central, Zimbabwe",
-    phone: "+263 67 22281",
+    distance: "1.2 miles",
+    address: "456 Oak Avenue, Westside",
+    phone: "(555) 234-5678",
     icon: Shield
   },
   {
     id: 3,
-    name: "Chinhoyi Community Centre",
+    name: "Community Center",
     category: "shelter",
-    distance: "1.5 miles",
-    address: "Community Rd, Chinhoyi, Zimbabwe",
-    phone: "+263 67 22345",
+    distance: "0.5 miles",
+    address: "789 Pine Street, Eastside",
+    phone: "(555) 345-6789",
     icon: Building
   },
   {
     id: 4,
-    name: "Chinhoyi Municipality Clinic",
+    name: "St. Mary's Hospital",
     category: "hospital",
-    distance: "2.1 miles",
-    address: "Orange Grove, Chinhoyi, Zimbabwe",
-    phone: "+263 67 23456",
+    distance: "1.5 miles",
+    address: "135 Care Way, Riverside",
+    phone: "(555) 456-7890",
     icon: Heart
   },
   {
     id: 5,
-    name: "Chinhoyi Fire Station",
+    name: "City Fire Station",
     category: "fire",
-    distance: "1.3 miles",
-    address: "Fire Brigade Road, Chinhoyi, Zimbabwe",
-    phone: "+263 67 22789",
-    icon: Building
-  },
-  {
-    id: 6,
-    name: "Chinhoyi Primary School (Emergency Shelter)",
-    category: "shelter",
-    distance: "2.0 miles",
-    address: "School Road, Chinhoyi, Zimbabwe",
-    phone: "+263 67 22890",
-    icon: Building
-  },
-  {
-    id: 7,
-    name: "Chinhoyi University Health Centre",
-    category: "hospital",
-    distance: "3.5 miles",
-    address: "CUT Campus, Chinhoyi, Zimbabwe",
-    phone: "+263 67 29001",
-    icon: Heart
-  },
-  {
-    id: 8,
-    name: "Chinhoyi Emergency Assembly Point",
-    category: "shelter",
-    distance: "0.5 miles",
-    address: "Town Center, Chinhoyi, Zimbabwe",
-    phone: "+263 67 22111",
+    distance: "0.7 miles",
+    address: "246 Elm Street, Downtown",
+    phone: "(555) 567-8901",
     icon: Building
   }
 ];
@@ -86,7 +58,7 @@ const chinhoyiLocations = [
 const Nearby = () => {
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [filteredLocations, setFilteredLocations] = useState(chinhoyiLocations);
+  const [filteredLocations, setFilteredLocations] = useState(mockLocations);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -100,7 +72,7 @@ const Nearby = () => {
   }, []);
 
   useEffect(() => {
-    let result = [...chinhoyiLocations];
+    let result = [...mockLocations];
     
     // Apply category filter
     if (activeTab !== "all") {
@@ -141,14 +113,14 @@ const Nearby = () => {
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center">
             <MapPin className="h-5 w-5 mr-2" />
-            <h1 className="text-xl font-bold">Nearby Locations in Chinhoyi</h1>
+            <h1 className="text-xl font-bold">Nearby Locations</h1>
           </div>
         </div>
         
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search nearby locations in Chinhoyi..."
+            placeholder="Search nearby locations..."
             className="pl-9 pr-4 py-2"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -164,7 +136,25 @@ const Nearby = () => {
             <TabsTrigger value="fire">Fire</TabsTrigger>
           </TabsList>
           
-          {/* Content is rendered below based on filtered locations */}
+          <TabsContent value="all">
+            {/* Content is rendered below based on filtered locations */}
+          </TabsContent>
+          
+          <TabsContent value="hospital">
+            {/* Hospital specific content would go here */}
+          </TabsContent>
+          
+          <TabsContent value="police">
+            {/* Police specific content would go here */}
+          </TabsContent>
+          
+          <TabsContent value="shelter">
+            {/* Shelter specific content would go here */}
+          </TabsContent>
+          
+          <TabsContent value="fire">
+            {/* Fire station specific content would go here */}
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -231,7 +221,7 @@ const Nearby = () => {
               <h3 className="text-lg font-semibold mb-1">No Locations Found</h3>
               <p className="text-muted-foreground">
                 {searchQuery 
-                  ? `No results for "${searchQuery}" in Chinhoyi`
+                  ? `No results for "${searchQuery}"`
                   : "No locations available for this category"}
               </p>
             </div>
@@ -240,7 +230,7 @@ const Nearby = () => {
 
         <div className="hidden md:block h-full min-h-[400px] rounded-lg overflow-hidden border border-border">
           <LocationMap
-            location={selectedLocation ? selectedLocation.address : "Chinhoyi, Zimbabwe"}
+            location={selectedLocation ? selectedLocation.address : "Current Location"}
             zoom={15}
             showDirections={true}
             className="w-full h-full"

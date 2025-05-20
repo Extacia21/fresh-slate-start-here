@@ -1,17 +1,14 @@
 
 import { useEffect, useState } from "react";
-import { Cloud, CloudRain, CloudLightning, Sun, Wind, Droplets } from "lucide-react";
+import { Cloud, CloudRain, CloudLightning, Sun, Thermometer, Wind, Droplets } from "lucide-react";
 
 interface WeatherData {
   temp: number;
   condition: string;
   humidity: number;
   windSpeed: number;
-  highTemp: number;
-  lowTemp: number;
   description: string;
   icon: React.ElementType;
-  warnings: string[];
 }
 
 const LiveWeatherWidget = () => {
@@ -22,7 +19,7 @@ const LiveWeatherWidget = () => {
     const conditions = condition.toLowerCase();
     if (conditions.includes('rain') || conditions.includes('shower')) {
       return CloudRain;
-    } else if (conditions.includes('thunder') || conditions.includes('storm')) {
+    } else if (conditions.includes('thunder') || conditions.includes('lightning') || conditions.includes('storm')) {
       return CloudLightning;
     } else if (conditions.includes('clear') || conditions.includes('sunny')) {
       return Sun;
@@ -31,51 +28,68 @@ const LiveWeatherWidget = () => {
     }
   };
 
-  useEffect(() => {
-    // Simulate fetching weather data for Chinhoyi, Zimbabwe
-    const fetchWeatherForChinhoyi = async () => {
-      setIsLoading(true);
+  const fetchWeather = async () => {
+    // In a real app, this would be an API call to a weather service API
+    // For this demo, we'll simulate weather data that would be fetched from a weather API
+    try {
+      // Simulate API fetch with different weather conditions
+      const conditions = [
+        "Partly Cloudy", 
+        "Light Rain", 
+        "Thunderstorms", 
+        "Clear Skies",
+        "Cloudy",
+        "Heavy Rain"
+      ];
       
-      // This would be an actual API call in production
-      // For now we're simulating the data
-      setTimeout(() => {
-        // Generate random but realistic weather for Chinhoyi (Zimbabwe has a warm climate)
-        const conditions = ["Partly Cloudy", "Mostly Sunny", "Clear", "Light Rain", "Scattered Showers"];
-        const randomCondition = conditions[Math.floor(Math.random() * conditions.length)];
-        
-        // Zimbabwe's temperature typically ranges between 20-30°C
-        const baseTemp = 22 + Math.floor(Math.random() * 8);
-        
-        // Generate random warnings based on the condition
-        let warnings: string[] = [];
-        if (randomCondition.includes("Rain")) {
-          warnings.push("Periodic rainfall expected throughout the day");
-        } else if (randomCondition === "Clear") {
-          warnings.push("High UV index expected, use sun protection");
-        }
-        
-        setWeather({
-          temp: baseTemp,
-          highTemp: baseTemp + 2 + Math.floor(Math.random() * 3),
-          lowTemp: baseTemp - 2 - Math.floor(Math.random() * 3),
-          condition: randomCondition,
-          humidity: 40 + Math.floor(Math.random() * 30),
-          windSpeed: 2 + Math.floor(Math.random() * 8),
-          description: `${randomCondition} in Chinhoyi, Zimbabwe`,
-          icon: getWeatherIcon(randomCondition),
-          warnings: warnings
-        });
-        
-        setIsLoading(false);
-      }, 1000);
-    };
+      const randomCondition = conditions[Math.floor(Math.random() * conditions.length)];
+      const randomTemp = Math.floor(Math.random() * 25) + 60; // 60-85°F
+      const randomHumidity = Math.floor(Math.random() * 50) + 30; // 30-80%
+      const randomWind = Math.floor(Math.random() * 15) + 1; // 1-15 mph
+      
+      let description = "";
+      if (randomCondition === "Partly Cloudy") {
+        description = "Partly cloudy with a chance of rain later";
+      } else if (randomCondition === "Light Rain") {
+        description = "Light rain showers, bring an umbrella";
+      } else if (randomCondition === "Thunderstorms") {
+        description = "Thunderstorms expected, stay indoors if possible";
+      } else if (randomCondition === "Clear Skies") {
+        description = "Clear skies and pleasant conditions";
+      } else if (randomCondition === "Cloudy") {
+        description = "Overcast with clouds, no precipitation expected";
+      } else {
+        description = "Heavy rain with possible flooding in low areas";
+      }
+      
+      setWeather({
+        temp: randomTemp,
+        condition: randomCondition,
+        humidity: randomHumidity,
+        windSpeed: randomWind,
+        description: description,
+        icon: getWeatherIcon(randomCondition)
+      });
+      
+      setIsLoading(false);
+    } catch (error) {
+      console.error("Error fetching weather data:", error);
+      setIsLoading(false);
+    }
+  };
 
-    fetchWeatherForChinhoyi();
+  useEffect(() => {
+    // Initial fetch
+    fetchWeather();
     
-    // Update weather every 30 minutes
-    const intervalId = setInterval(fetchWeatherForChinhoyi, 1800000);
+    // Set up interval for less frequent updates (every 30 minutes instead of every minute)
+    // In a real app, this would be aligned with the weather API's update frequency
+    const interval = setInterval(() => {
+      fetchWeather();
+    }, 1800000); // 30 minutes
     
-    return () => clearInterval(intervalId);
+    // Clean up interval
+    return () => clearInterval(interval);
   }, []);
 
   if (isLoading) {
@@ -87,30 +101,28 @@ const LiveWeatherWidget = () => {
   if (!weather) {
     return (
       <div className="bg-secondary p-4 rounded-xl text-foreground">
-        <p className="text-center">Weather data unavailable for Chinhoyi</p>
+        <p className="text-center">Weather data unavailable</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-gradient-to-r from-blue-500 to-blue-700 p-4 rounded-xl text-white shadow-lg">
+    <div className="bg-gradient-to-r from-blue-500 to-blue-700 p-4 rounded-xl text-white shadow-lg relative dark:from-blue-700 dark:to-blue-900">
       <div className="flex items-center justify-between">
-        <div className="flex flex-col">
-          <span className="text-xs font-medium mb-1">Chinhoyi, Zimbabwe</span>
+        <div>
           <div className="flex items-center">
             <weather.icon className="h-10 w-10 mr-3" />
             <div>
-              <h2 className="font-bold text-2xl">{weather.temp}°C</h2>
+              <h2 className="font-bold text-2xl">{weather.temp}°F</h2>
               <p className="text-sm opacity-90">{weather.condition}</p>
             </div>
           </div>
           <p className="text-sm mt-2 opacity-90">{weather.description}</p>
-          <p className="text-xs mt-1">High: {weather.highTemp}°C | Low: {weather.lowTemp}°C</p>
         </div>
         <div className="space-y-2">
           <div className="flex items-center text-xs">
             <Wind className="h-3 w-3 mr-1" />
-            <span>Wind: {weather.windSpeed} km/h</span>
+            <span>Wind: {weather.windSpeed} mph</span>
           </div>
           <div className="flex items-center text-xs">
             <Droplets className="h-3 w-3 mr-1" />
@@ -118,15 +130,6 @@ const LiveWeatherWidget = () => {
           </div>
         </div>
       </div>
-      
-      {weather.warnings.length > 0 && (
-        <div className="mt-2 pt-2 border-t border-white/20">
-          <p className="text-xs font-semibold">Weather Alerts:</p>
-          {weather.warnings.map((warning, index) => (
-            <p key={index} className="text-xs mt-1 opacity-90">{warning}</p>
-          ))}
-        </div>
-      )}
     </div>
   );
 };

@@ -1,347 +1,322 @@
-
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import type { Report } from "@/integrations/supabase/reports";
+import { getReports, getReportById } from "@/integrations/supabase/reports";
+import { useEffect, useState } from 'react';
 import { toast } from "sonner";
-import { format, formatDistance } from "date-fns";
 
-// Alert type color definitions
-export const alertTypeColors = {
-  police: {
-    bg: "bg-yellow-100",
-    text: "text-yellow-800",
-    border: "border-yellow-200"
-  },
-  fire: {
-    bg: "bg-red-100",
-    text: "text-red-800",
-    border: "border-red-200"
-  },
-  health: {
-    bg: "bg-green-100",
-    text: "text-green-800",
-    border: "border-green-200"
-  },
-  weather: {
-    bg: "bg-blue-100",
-    text: "text-blue-800",
-    border: "border-blue-200"
-  },
-  other: {
-    bg: "bg-gray-100",
-    text: "text-gray-800",
-    border: "border-gray-200"
-  }
-};
-
-// Function to format relative time
-export const formatRelativeTime = (timestamp: string): string => {
-  try {
-    return formatDistance(new Date(timestamp), new Date(), { addSuffix: true });
-  } catch (error) {
-    console.error("Error formatting date:", error);
-    return "Unknown time";
-  }
-};
-
-// Define the database Alert type - matching the actual database schema
-type DatabaseAlert = {
-  id: string;
-  created_at: string;
-  updated_at: string;
-  title: string;
-  description: string;
-  severity: "low" | "medium" | "high" | "critical";
-  alert_type: "police" | "fire" | "health" | "weather" | "other";
-  start_time: string;
-  end_time: string | null;
-  created_by: string | null;
-  latitude: number;
-  longitude: number;
-  radius: number;
-  source: string | null;
-};
-
-// Define the Alert interface with all required properties
-export interface Alert {
-  id: string;
-  created_at: string;
-  updated_at: string;
-  title: string;
-  description: string;
-  severity: "low" | "medium" | "high" | "critical";
-  alert_type: "police" | "fire" | "health" | "weather" | "other";
-  type?: "police" | "fire" | "health" | "weather" | "other"; // Add type as an optional alias for alert_type
-  start_time: string;
-  end_time: string | null;
-  created_by: string | null;
-  latitude: number;
-  longitude: number;
-  radius: number;
-  source?: string | null;
-  // Additional properties we compute or add
-  location?: string;
-  status?: string;
-  is_resolved?: boolean;
-  category?: string;
-  user_id?: string;
-  updates?: any[];
+// Since we don't have an alerts table, we'll use reports as alerts
+export interface Alert extends Report {
+  severity: "critical" | "high" | "medium" | "low";
+  source?: "official" | "user-reported" | string;
 }
 
-// Helper function to transform database alert to our Alert interface
-const transformDatabaseAlert = (dbAlert: DatabaseAlert): Alert => {
+// Store alerts in memory to prevent losing them
+let alertsCache: Alert[] = [];
+
+// Color mapping for alert types
+export const alertTypeColors = {
+  fire: {
+    bg: 'bg-red-100',
+    text: 'text-red-800',
+    icon: 'text-red-600',
+    border: 'border-red-200'
+  },
+  police: {
+    bg: 'bg-yellow-100',
+    text: 'text-yellow-800',
+    icon: 'text-yellow-600',
+    border: 'border-yellow-200'
+  },
+  health: {
+    bg: 'bg-green-100',
+    text: 'text-green-800',
+    icon: 'text-green-600',
+    border: 'border-green-200'
+  },
+  weather: {
+    bg: 'bg-blue-100',
+    text: 'text-blue-800',
+    icon: 'text-blue-600',
+    border: 'border-blue-200'
+  },
+  other: {
+    bg: 'bg-gray-100',
+    text: 'text-gray-800',
+    icon: 'text-gray-600',
+    border: 'border-gray-200'
+  }
+};
+
+export const useGetAlerts = () => {
+  const [localAlerts, setLocalAlerts] = useState<Alert[]>(alertsCache);
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['alerts'],
+    queryFn: async () => {
+      // Get alerts (using reports as mock)
+      const { data, error } = await getReports();
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      // Convert reports to alerts
+      const alerts = data?.map(report => ({
+        ...report,
+        severity: report.severity || "medium",
+        source: report.user_id ? "user-reported" : "official"
+      })) as Alert[];
+
+      // Update our cache
+      alertsCache = alerts;
+      
+      return alerts;
+    },
+    refetchInterval: 15000, // Refetch every 15 seconds to keep data fresh
+  });
+
+  // Update local state when data changes
+  useEffect(() => {
+    if (data) {
+      setLocalAlerts(data);
+    }
+  }, [data]);
+
+  // Handle new alert subscription
+  useEffect(() => {
+    const handleNewAlert = (event: CustomEvent) => {
+      if (event.detail && event.detail.type === 'new-report') {
+        const newAlert: Alert = {
+          ...event.detail.report,
+          severity: event.detail.report.severity || "medium",
+          source: event.detail.report.user_id ? "user-reported" : "official"
+        };
+        
+        // Update local state with new alert at the top
+        setLocalAlerts(prev => {
+          // Check if already exists to prevent duplicates
+          if (prev.some(a => a.id === newAlert.id)) {
+            return prev;
+          }
+          const newAlerts = [newAlert, ...prev];
+          alertsCache = newAlerts; // Update cache
+          return newAlerts;
+        });
+      }
+    };
+
+    window.addEventListener('report-created', handleNewAlert as EventListener);
+    
+    return () => {
+      window.removeEventListener('report-created', handleNewAlert as EventListener);
+    };
+  }, []);
+
   return {
-    ...dbAlert,
-    location: `${dbAlert.latitude}, ${dbAlert.longitude}`,
-    status: 'active',
-    is_resolved: false,
-    category: dbAlert.alert_type,
-    user_id: dbAlert.created_by,
-    updates: [],
-    type: dbAlert.alert_type  // Add type as alias for alert_type
+    data: localAlerts,
+    isLoading,
+    error,
   };
 };
 
-// Hook to get all alerts
-export const useGetAllAlerts = () => {
-  return useQuery({
-    queryKey: ['alerts'],
-    queryFn: async (): Promise<Alert[]> => {
-      const { data, error } = await supabase
-        .from('alerts')
-        .select('*')
-        .order('created_at', { ascending: false });
+export const useGetRecentAlerts = (limit = 10) => {
+  const [localAlerts, setLocalAlerts] = useState<Alert[]>([]);
 
-      if (error) throw error;
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['recent-alerts', limit],
+    queryFn: async () => {
+      // Get alerts (using reports as mock)
+      const { data, error } = await getReports();
       
-      return data.map(alert => transformDatabaseAlert(alert as DatabaseAlert));
-    }
-  });
-};
-
-// Hook to get a single alert by ID
-export const useGetAlertById = (id: string) => {
-  return useQuery({
-    queryKey: ['alerts', id],
-    queryFn: async (): Promise<Alert> => {
-      const { data, error } = await supabase
-        .from('alerts')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) throw error;
-      
-      return transformDatabaseAlert(data as DatabaseAlert);
-    },
-    enabled: !!id
-  });
-};
-
-// Hook to get alerts by type
-export const useGetAlertsByType = (type: Alert['alert_type']) => {
-  return useQuery({
-    queryKey: ['alerts', 'type', type],
-    queryFn: async (): Promise<Alert[]> => {
-      const { data, error } = await supabase
-        .from('alerts')
-        .select('*')
-        .eq('alert_type', type)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      return data.map(alert => transformDatabaseAlert(alert as DatabaseAlert));
-    },
-    enabled: !!type
-  });
-};
-
-// Hook to create an alert
-export const useCreateAlert = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (newAlert: Partial<Alert>) => {
-      // Extract only the fields that are in the database schema
-      const dbAlert = {
-        title: newAlert.title || 'Alert',
-        description: newAlert.description || "",
-        severity: newAlert.severity || "medium",
-        alert_type: newAlert.alert_type || "other",
-        start_time: newAlert.start_time || new Date().toISOString(),
-        end_time: newAlert.end_time || null,
-        created_by: newAlert.created_by || null,
-        latitude: newAlert.latitude || 0,
-        longitude: newAlert.longitude || 0,
-        radius: newAlert.radius || 1000, // Default radius in meters
-        source: newAlert.source || null
-      };
-
-      const { data, error } = await supabase
-        .from('alerts')
-        .insert([dbAlert])
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      // Add the alert to the user's alert history if created_by is available
-      if (data.created_by) {
-        try {
-          await supabase
-            .from('user_alert_history')
-            .insert([{ 
-              user_id: data.created_by, 
-              alert_id: data.id, 
-              action: 'created',
-              dismissed: false,
-              saved: false
-            }]);
-        } catch (historyError) {
-          console.error("Error creating history:", historyError);
-        }
+      if (error) {
+        throw new Error(error.message);
       }
-
-      // Transform the result to our Alert interface
-      return transformDatabaseAlert(data as DatabaseAlert);
+      
+      // Sort by created_at (newest first) and limit
+      const alerts = data
+        ?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, limit)
+        .map(report => ({
+          ...report,
+          severity: report.severity || "medium",
+          source: report.user_id ? "user-reported" : "official"
+        }));
+        
+      return alerts as Alert[];
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['alerts'] });
-      toast.success('Alert created successfully');
-    },
-    onError: (error: any) => {
-      toast.error(`Failed to create alert: ${error.message}`);
-      console.error('Error creating alert:', error);
-    }
+    refetchInterval: 15000, // Refetch every 15 seconds for simulation
   });
-};
 
-// Hook to update an alert
-export const useUpdateAlert = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<Alert> & { id: string }) => {
-      // Extract only fields that are in the database schema
-      const dbUpdates: Partial<DatabaseAlert> = {};
-      
-      if (updates.title) dbUpdates.title = updates.title;
-      if (updates.description) dbUpdates.description = updates.description;
-      if (updates.severity) dbUpdates.severity = updates.severity;
-      if (updates.alert_type) dbUpdates.alert_type = updates.alert_type;
-      if (updates.start_time) dbUpdates.start_time = updates.start_time;
-      if (updates.end_time) dbUpdates.end_time = updates.end_time;
-      if (updates.latitude) dbUpdates.latitude = updates.latitude;
-      if (updates.longitude) dbUpdates.longitude = updates.longitude;
-      if (updates.radius) dbUpdates.radius = updates.radius;
-      if ('source' in updates) dbUpdates.source = updates.source;
-      
-      // Always update the updated_at timestamp
-      dbUpdates.updated_at = new Date().toISOString();
-      
-      const { data, error } = await supabase
-        .from('alerts')
-        .update(dbUpdates)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      // Transform the result to our Alert interface
-      return transformDatabaseAlert(data as DatabaseAlert);
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['alerts'] });
-      queryClient.invalidateQueries({ queryKey: ['alerts', data.id] });
-      toast.success('Alert updated successfully');
-    },
-    onError: (error: any) => {
-      toast.error(`Failed to update alert: ${error.message}`);
-      console.error('Error updating alert:', error);
-    }
-  });
-};
-
-// Hook to delete an alert
-export const useDeleteAlert = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('alerts')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      
-      return id;
-    },
-    onSuccess: (id) => {
-      queryClient.invalidateQueries({ queryKey: ['alerts'] });
-      queryClient.invalidateQueries({ queryKey: ['alerts', id] });
-      toast.success('Alert deleted successfully');
-    },
-    onError: (error: any) => {
-      toast.error(`Failed to delete alert: ${error.message}`);
-      console.error('Error deleting alert:', error);
-    }
-  });
-};
-
-// Hook to track alert interaction in user history
-export const useSubscribeToAlert = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ userId, alertId }: { userId: string, alertId: string }) => {
-      // Use user_alert_history instead of a subscription table
-      const { error } = await supabase
-        .from('user_alert_history')
-        .insert([{ 
-          user_id: userId, 
-          alert_id: alertId,
-          action: 'subscribed',
-          viewed_at: new Date().toISOString(),
-          saved: true
-        }]);
-
-      if (error) throw error;
-      
-      return { userId, alertId };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['alert-subscriptions'] });
-      toast.success('Alert saved successfully');
-    },
-    onError: (error: any) => {
-      toast.error(`Failed to save alert: ${error.message}`);
-      console.error('Error saving alert:', error);
-    }
-  });
-};
-
-// Hook to subscribe to real-time alerts
-export const useSubscribeToAlerts = (callback: (alerts: Alert[] | Alert) => void) => {
+  // Update local state when data changes
   useEffect(() => {
-    const channel = supabase
-      .channel('alerts-channel')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alerts' }, (payload) => {
-        const newAlert = payload.new as DatabaseAlert;
+    if (data) {
+      setLocalAlerts(data);
+    }
+  }, [data]);
+
+  // Handle new alert subscription
+  useEffect(() => {
+    const handleNewAlert = (event: CustomEvent) => {
+      if (event.detail && event.detail.type === 'new-report') {
+        const newAlert: Alert = {
+          ...event.detail.report,
+          severity: event.detail.report.severity || "medium",
+          source: event.detail.report.user_id ? "user-reported" : "official"
+        };
         
-        // Transform the alert
-        const enrichedAlert = transformDatabaseAlert(newAlert);
-        
-        callback(enrichedAlert);
-      })
-      .subscribe();
-      
-    return () => {
-      channel.unsubscribe();
+        // Add new alert to local state at the top
+        setLocalAlerts(prev => {
+          // Check if already exists to prevent duplicates
+          if (prev.some(a => a.id === newAlert.id)) {
+            return prev;
+          }
+          
+          // Keep the array limited to the specified limit
+          const newAlerts = [newAlert, ...prev];
+          if (newAlerts.length > limit) {
+            return newAlerts.slice(0, limit);
+          }
+          return newAlerts;
+        });
+
+        // Show toast notification for new alert
+        toast.info(`New Alert: ${newAlert.title}`, {
+          description: newAlert.description.substring(0, 50) + (newAlert.description.length > 50 ? '...' : ''),
+        });
+      }
     };
+
+    window.addEventListener('report-created', handleNewAlert as EventListener);
+    
+    return () => {
+      window.removeEventListener('report-created', handleNewAlert as EventListener);
+    };
+  }, [limit]);
+
+  return {
+    data: localAlerts,
+    isLoading,
+    error,
+  };
+};
+
+export const useGetAlertById = (id: string | undefined) => {
+  const [localAlert, setLocalAlert] = useState<Alert | null>(null);
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['alert', id],
+    queryFn: async () => {
+      if (!id) return null;
+      
+      // Get the report by ID
+      const { data, error } = await getReportById(id);
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      if (!data) {
+        throw new Error("Alert not found");
+      }
+      
+      return {
+        ...data,
+        severity: data.severity || "medium",
+        source: data.user_id ? "user-reported" : "official"
+      } as Alert;
+    },
+    enabled: !!id,
+  });
+
+  // Update local state when data changes
+  useEffect(() => {
+    if (data) {
+      setLocalAlert(data);
+    }
+  }, [data]);
+
+  // Handle alert updates
+  useEffect(() => {
+    const handleAlertUpdate = (event: CustomEvent) => {
+      if (event.detail && 
+          event.detail.type === 'update-report' && 
+          event.detail.report.id === id) {
+        setLocalAlert(prevAlert => {
+          if (!prevAlert) return null;
+          return {
+            ...prevAlert,
+            ...event.detail.report,
+            // Preserve alert-specific fields
+            severity: event.detail.report.severity || prevAlert.severity,
+            source: event.detail.report.source || prevAlert.source
+          };
+        });
+      }
+    };
+
+    window.addEventListener('report-updated', handleAlertUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('report-updated', handleAlertUpdate as EventListener);
+    };
+  }, [id]);
+
+  return {
+    data: localAlert || data,
+    isLoading,
+    error,
+  };
+};
+
+// Separate subscription function from hook
+export const subscribeToAlerts = (callback: (alert: Alert) => void) => {
+  const handleReportCreated = (event: any) => {
+    if (event.detail && event.detail.type === 'new-report') {
+      // Convert report to alert format
+      const alert: Alert = {
+        ...event.detail.report,
+        severity: event.detail.report.severity || "medium",
+        source: event.detail.report.user_id ? "user-reported" : "official"
+      };
+      callback(alert);
+    }
+  };
+
+  window.addEventListener('report-created', handleReportCreated);
+  
+  // Return cleanup function
+  return () => {
+    window.removeEventListener('report-created', handleReportCreated);
+  };
+};
+
+// Hook that uses the subscribe function
+export const useSubscribeToAlerts = (callback: (alert: Alert) => void) => {
+  useEffect(() => {
+    const unsubscribe = subscribeToAlerts(callback);
+    return unsubscribe;
   }, [callback]);
 };
 
-// Need to import useEffect for the subscription hook
-import { useEffect } from "react";
+// Format timestamp relative to current time
+export const formatRelativeTime = (timestamp: string): string => {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  
+  if (diffMins < 1) {
+    return "Just now";
+  } else if (diffMins < 60) {
+    return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`;
+  } else if (diffHours < 24) {
+    return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+  } else if (diffDays < 7) {
+    return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
+  } else {
+    return date.toLocaleDateString();
+  }
+};

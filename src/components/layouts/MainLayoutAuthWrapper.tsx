@@ -1,14 +1,14 @@
 
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import MainLayout from './MainLayout';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
+// The component was showing a TypeScript error because ProtectedRoute expected children as ReactNode
 const MainLayoutAuthWrapper = () => {
   const [hasShownWelcomeToast, setHasShownWelcomeToast] = useState(false);
-  const navigate = useNavigate();
   
   // Check for auth session once and show welcome toast only on new login
   useEffect(() => {
@@ -30,15 +30,10 @@ const MainLayoutAuthWrapper = () => {
           description: 'Welcome to the Crisis Management App',
         });
       }
-      
-      // If we have a session but are on the base /app route, redirect to home
-      if (sessionId && window.location.pathname === '/app') {
-        navigate('/app');
-      }
     };
     
     handleAuthChange();
-  }, [hasShownWelcomeToast, navigate]);
+  }, [hasShownWelcomeToast]);
   
   return (
     <ProtectedRoute redirectTo="/signin">

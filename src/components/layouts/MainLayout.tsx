@@ -30,8 +30,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
         <main className="flex-1 overflow-auto pb-20">
           {children}
         </main>
-        {/* Update SOS button to not use hidden prop if it's not supported */}
-        {!isChatRoute && <SOSButton />}
+        <SOSButton hidden={isChatRoute} />
         <BottomNavigation />
       </div>
     </ScrollProvider>

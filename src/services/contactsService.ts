@@ -1,264 +1,179 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-
-// Define Contact types
-export type ContactType = "emergency" | "personal" | "service";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface Contact {
-  id: string | number;
+  id: string;
   name: string;
   phone: string;
-  email?: string;
   relationship?: string;
-  type: ContactType;
+  type: string;
   is_favorite: boolean;
-  user_id: string | null;
-  created_at?: string;
+  created_at: string;
+  user_id?: string;
 }
 
-// Create contact hook
+export const useGetContacts = () => {
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['contacts'],
+    queryFn: async () => {
+      // First, get user's personal contacts
+      let personalContacts: Contact[] = [];
+      
+      if (user) {
+        const { data: userContacts, error: userError } = await supabase
+          .from('contacts')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('is_favorite', { ascending: false })
+          .order('created_at', { ascending: false });
+        
+        if (userError) {
+          throw new Error(userError.message);
+        }
+        
+        personalContacts = userContacts as Contact[];
+      }
+      
+      // Then, get default emergency contacts (null user_id)
+      const { data: defaultContacts, error: defaultError } = await supabase
+        .from('contacts')
+        .select('*')
+        .is('user_id', null)
+        .order('is_favorite', { ascending: false });
+      
+      if (defaultError) {
+        throw new Error(defaultError.message);
+      }
+      
+      // Combine both sets of contacts
+      const allContacts = [...personalContacts, ...(defaultContacts as Contact[])];
+      
+      return allContacts;
+    },
+  });
+};
+
 export const useCreateContact = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   
   return useMutation({
-    mutationFn: async (contactData: Omit<Contact, "id" | "created_at" | "user_id">) => {
-      const result = await createContact(contactData);
-      return result;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contacts"] });
-    },
-  });
-};
-
-// Get all contacts
-export const useGetContacts = () => {
-  return useQuery({
-    queryKey: ["contacts"],
-    queryFn: async () => {
-      const { data: user } = await supabase.auth.getUser();
+    mutationFn: async (contact: Omit<Contact, 'id' | 'created_at' | 'user_id'>) => {
+      if (!user) throw new Error("User not authenticated");
       
-      if (!user.user) {
-        throw new Error("User not authenticated");
-      }
-      
-      const { data, error } = await supabase
-        .from("contacts")
-        .select("*")
-        .eq("user_id", user.user.id)
-        .order("name");
-      
-      if (error) {
-        throw new Error(error.message);
-      }
-      
-      // Transform data to match our Contact interface
-      return (data || []).map((contact) => {
-        return {
-          ...contact,
-          type: contact.type as ContactType
-        } as Contact;
-      });
-    },
-  });
-};
-
-// Get emergency contacts
-export const getEmergencyContacts = async (): Promise<Contact[]> => {
-  try {
-    const { data: user } = await supabase.auth.getUser();
-    
-    if (!user.user) {
-      console.warn("User not authenticated, returning empty contacts list");
-      return [];
-    }
-    
-    const { data, error } = await supabase
-      .from("contacts")
-      .select("*")
-      .eq("user_id", user.user.id)
-      .eq("type", "emergency")
-      .order("name");
-    
-    if (error) {
-      throw new Error(error.message);
-    }
-    
-    // Transform data to match our Contact interface
-    return (data || []).map((contact) => {
-      return {
+      // Create the contact with the user_id
+      const newContact = {
         ...contact,
-        type: contact.type as ContactType
-      } as Contact;
-    });
-  } catch (error) {
-    console.error("Error fetching emergency contacts:", error);
-    return [];
-  }
-};
-
-// Send SOS alert function
-export const sendSOSAlert = async (
-  contacts: Contact[], 
-  location: string, 
-  message: string
-): Promise<{ success: boolean; message: string }> => {
-  try {
-    const { data: user } = await supabase.auth.getUser();
-    
-    if (!user.user) {
-      return { success: false, message: "User not authenticated" };
-    }
-    
-    // Log the SOS event to the database
-    const { error: sosError } = await supabase
-      .from("user_alert_history")
-      .insert({
-        user_id: user.user.id,
-        alert_id: `sos-${Date.now()}`, // Generate a unique ID for the SOS event
-        created_at: new Date().toISOString(),
-        dismissed: false,
-        viewed_at: null
-      });
-    
-    if (sosError) {
-      console.error("Error logging SOS event:", sosError);
-      // Continue even if logging fails
-    }
-    
-    // In a real app, this would send SMS and emails to contacts
-    // For now, we'll just log them
-    console.log(`SOS Alert to ${contacts.length} contacts: ${message} at ${location}`);
-    
-    contacts.forEach(contact => {
-      console.log(`Would send alert to ${contact.name} via ${contact.phone}`);
-      if (contact.email) {
-        console.log(`Would also email ${contact.email}`);
-      }
-    });
-    
-    return { 
-      success: true, 
-      message: `Alert sent to ${contacts.length} emergency contacts` 
-    };
-  } catch (error) {
-    console.error("Error sending SOS alert:", error);
-    return { 
-      success: false, 
-      message: error instanceof Error ? error.message : "Unknown error occurred" 
-    };
-  }
-};
-
-// Create a new contact
-export const createContact = async (contactData: Omit<Contact, "id" | "created_at" | "user_id">): Promise<Contact> => {
-  const { data: user } = await supabase.auth.getUser();
-  
-  if (!user.user) {
-    throw new Error("User not authenticated");
-  }
-  
-  const { data, error } = await supabase
-    .from("contacts")
-    .insert({
-      ...contactData,
-      user_id: user.user.id,
-      created_at: new Date().toISOString(),
-    })
-    .select()
-    .single();
-  
-  if (error) {
-    throw error;
-  }
-  
-  return {
-    ...data,
-    type: data.type as ContactType
-  } as Contact;
-};
-
-// Update contact hook
-export const useUpdateContact = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async ({ id, contact }: { id: string; contact: Partial<Omit<Contact, "id">> }) => {
+        user_id: user.id,
+      };
+      
       const { data, error } = await supabase
-        .from("contacts")
-        .update(contact)
-        .eq("id", id)
+        .from('contacts')
+        .insert(newContact)
         .select()
         .single();
       
       if (error) {
-        throw error;
-      }
-      
-      return {
-        ...data,
-        type: data.type as ContactType
-      } as Contact;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contacts"] });
-    },
-  });
-};
-
-// Delete contact
-export const deleteContact = async (id: string): Promise<void> => {
-  const { error } = await supabase
-    .from("contacts")
-    .delete()
-    .eq("id", id);
-  
-  if (error) {
-    throw error;
-  }
-};
-
-// Get favorite contacts
-export const useGetFavoriteContacts = () => {
-  return useQuery({
-    queryKey: ["favoriteContacts"],
-    queryFn: async () => {
-      const { data: user } = await supabase.auth.getUser();
-      
-      if (!user.user) {
-        throw new Error("User not authenticated");
-      }
-      
-      const { data, error } = await supabase
-        .from("contacts")
-        .select("*")
-        .eq("user_id", user.user.id)
-        .eq("is_favorite", true)
-        .order("name");
-      
-      if (error) {
         throw new Error(error.message);
       }
       
-      return data.map((contact) => {
-        return {
-          ...contact,
-          type: contact.type as ContactType
-        } as Contact;
+      return data as Contact;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['contacts'],
       });
     },
   });
 };
 
-// Export everything needed
-export default {
-  useGetContacts,
-  getEmergencyContacts,
-  createContact,
-  useCreateContact,
-  useUpdateContact,
-  deleteContact,
-  useGetFavoriteContacts,
-  sendSOSAlert
+export const useUpdateContact = () => {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
+  return useMutation({
+    mutationFn: async (contact: Partial<Contact> & { id: string }) => {
+      // Check if this is a default contact (null user_id)
+      const { data: existingContact, error: checkError } = await supabase
+        .from('contacts')
+        .select('user_id')
+        .eq('id', contact.id)
+        .single();
+      
+      if (checkError) {
+        throw new Error(checkError.message);
+      }
+      
+      // If it's a default contact, don't allow updates
+      if (existingContact.user_id === null) {
+        throw new Error("Cannot update default emergency contacts");
+      }
+      
+      // Otherwise, proceed with update
+      const { data, error } = await supabase
+        .from('contacts')
+        .update(contact)
+        .eq('id', contact.id)
+        .eq('user_id', user?.id)
+        .select()
+        .single();
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      return data as Contact;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['contacts'],
+      });
+    },
+  });
+};
+
+export const useDeleteContact = () => {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // Check if this is a default contact (null user_id)
+      const { data: existingContact, error: checkError } = await supabase
+        .from('contacts')
+        .select('user_id')
+        .eq('id', id)
+        .single();
+      
+      if (checkError) {
+        throw new Error(checkError.message);
+      }
+      
+      // If it's a default contact, don't allow deletion
+      if (existingContact.user_id === null) {
+        throw new Error("Cannot delete default emergency contacts");
+      }
+      
+      // Otherwise, proceed with delete
+      const { error } = await supabase
+        .from('contacts')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user?.id);
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      return id;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['contacts'],
+      });
+    },
+  });
 };

@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Shield, MapPin, AlertCircle, ArrowRight, ArrowLeft } from "lucide-react";
@@ -31,14 +31,6 @@ const onboardingSlides = [
 const Onboarding = () => {
   const [activeSlide, setActiveSlide] = useState(0);
   const navigate = useNavigate();
-  
-  // Check if user has already seen onboarding
-  useEffect(() => {
-    const hasSeenOnboarding = localStorage.getItem("hasSeenOnboarding") === "true";
-    if (hasSeenOnboarding) {
-      navigate("/signin");
-    }
-  }, [navigate]);
 
   const handleNext = () => {
     if (activeSlide < onboardingSlides.length - 1) {

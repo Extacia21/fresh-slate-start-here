@@ -1,13 +1,22 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, User } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, User, Map, Droplet, Phone } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from '@/integrations/supabase/client';
-import FillProfileForm from "@/components/forms/FillProfileForm";
 
 const FillProfile = () => {
+  const [formData, setFormData] = useState({
+    phone: "",
+    address: "",
+    bloodType: "",
+    emergencyContact: "",
+    emergencyRelation: "",
+    emergencyPhone: "",
+  });
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
@@ -27,16 +36,47 @@ const FillProfile = () => {
     }
   }, [navigate]);
 
-  const handleSubmit = async (formData: any) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    setFormData((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const handleSelectChange = (value: string, field: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleNext = () => {
+    if (step === 1) {
+      if (!formData.phone || !formData.address) {
+        toast({
+          title: "Error",
+          description: "Please fill in all required fields",
+          variant: "destructive",
+        });
+        return;
+      }
+      setStep(2);
+    } else {
+      handleSubmit();
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!formData.emergencyContact || !formData.emergencyPhone) {
+      toast({
+        title: "Error",
+        description: "Please provide emergency contact information",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
       // Get the user ID if they signed up and got an email confirmation automatically
       const { data: authData } = await supabase.auth.getSession();
       const userId = authData.session?.user?.id;
-      
-      // Format date of birth to ISO string if it exists
-      const dateOfBirth = formData.dateOfBirth ? formData.dateOfBirth.toISOString().split('T')[0] : null;
       
       if (userId) {
         // User is already authenticated, update their profile
@@ -49,40 +89,18 @@ const FillProfile = () => {
             phone: formData.phone,
             address: formData.address,
             blood_type: formData.bloodType,
-            allergies: formData.allergies,
-            date_of_birth: dateOfBirth,
             emergency_contact_name: formData.emergencyContact,
             emergency_contact_phone: formData.emergencyPhone,
             emergency_contact_relation: formData.emergencyRelation,
-            emergency_contact_email: formData.emergencyEmail,
           });
           
         if (error) {
           throw error;
         }
         
-        // Add emergency contact to contacts table
-        if (formData.emergencyContact && formData.emergencyPhone) {
-          const { error: contactError } = await supabase
-            .from('contacts')
-            .upsert({
-              user_id: userId,
-              name: formData.emergencyContact,
-              phone: formData.emergencyPhone,
-              email: formData.emergencyEmail || null,
-              type: 'emergency',
-              relationship: formData.emergencyRelation || null,
-              is_favorite: true,
-            });
-            
-          if (contactError) {
-            console.error("Error saving emergency contact:", contactError);
-          }
-        }
-        
         toast({
           title: "Profile completed",
-          description: "Please check your email and confirm your registration.",
+          description: "Your profile has been updated successfully",
         });
         
         navigate("/app"); // Direct to app if already authenticated
@@ -94,19 +112,16 @@ const FillProfile = () => {
           phone: formData.phone,
           address: formData.address,
           blood_type: formData.bloodType,
-          allergies: formData.allergies,
-          date_of_birth: dateOfBirth,
           emergency_contact_name: formData.emergencyContact,
           emergency_contact_phone: formData.emergencyPhone,
           emergency_contact_relation: formData.emergencyRelation,
-          emergency_contact_email: formData.emergencyEmail,
         };
         
         localStorage.setItem("pendingProfileData", JSON.stringify(profileData));
         
         toast({
           title: "Profile information saved",
-          description: "Please check your email and confirm your registration.",
+          description: "Please sign in to complete your registration",
         });
         
         // Clean up session storage
@@ -160,12 +175,124 @@ const FillProfile = () => {
           </p>
         </div>
 
-        <FillProfileForm 
-          onSubmit={handleSubmit}
-          isSubmitting={isLoading}
-          step={step}
-          setStep={setStep}
-        />
+        <div className="space-y-4 max-w-sm mx-auto w-full">
+          {step === 1 ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone Number</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="Enter your phone number"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    className="input-crisis pl-10"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="address">Address</Label>
+                <div className="relative">
+                  <Map className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    id="address"
+                    type="text"
+                    placeholder="Enter your address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    className="input-crisis pl-10"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="bloodType">Blood Type (Optional)</Label>
+                <div className="relative">
+                  <Droplet className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Select onValueChange={(value) => handleSelectChange(value, "bloodType")}>
+                    <SelectTrigger className="input-crisis pl-10">
+                      <SelectValue placeholder="Select your blood type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="A+">A+</SelectItem>
+                      <SelectItem value="A-">A-</SelectItem>
+                      <SelectItem value="B+">B+</SelectItem>
+                      <SelectItem value="B-">B-</SelectItem>
+                      <SelectItem value="AB+">AB+</SelectItem>
+                      <SelectItem value="AB-">AB-</SelectItem>
+                      <SelectItem value="O+">O+</SelectItem>
+                      <SelectItem value="O-">O-</SelectItem>
+                      <SelectItem value="unknown">Don't know</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="emergencyContact">Emergency Contact Name</Label>
+                <Input
+                  id="emergencyContact"
+                  type="text"
+                  placeholder="Name of emergency contact"
+                  value={formData.emergencyContact}
+                  onChange={handleChange}
+                  className="input-crisis"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="emergencyRelation">Relationship</Label>
+                <Select onValueChange={(value) => handleSelectChange(value, "emergencyRelation")}>
+                  <SelectTrigger className="input-crisis">
+                    <SelectValue placeholder="Select relationship" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="spouse">Spouse</SelectItem>
+                    <SelectItem value="parent">Parent</SelectItem>
+                    <SelectItem value="child">Child</SelectItem>
+                    <SelectItem value="sibling">Sibling</SelectItem>
+                    <SelectItem value="friend">Friend</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="emergencyPhone">Emergency Contact Phone</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    id="emergencyPhone"
+                    type="tel"
+                    placeholder="Emergency contact phone number"
+                    value={formData.emergencyPhone}
+                    onChange={handleChange}
+                    className="input-crisis pl-10"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+          
+          <Button 
+            onClick={handleNext} 
+            className="w-full py-6 mt-6" 
+            disabled={isLoading}
+          >
+            {isLoading ? "Saving..." : step === 1 ? "Next" : "Complete Profile"}
+          </Button>
+          
+          {step === 2 && (
+            <p className="text-xs text-muted-foreground text-center mt-4">
+              This information will only be shared with emergency responders when you activate the SOS feature.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

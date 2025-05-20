@@ -17,7 +17,7 @@ interface AlertCardProps {
   icon?: LucideIcon;
   location?: string;
   category?: string;
-  id?: string; // Accept string IDs
+  id?: number | string; // Accept both number and string IDs
   onClick?: () => void;
 }
 

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { 
   Sheet, 
@@ -20,7 +19,7 @@ import { MapPin } from "lucide-react";
 import { useCreateReport } from "@/services/reportsService";
 import { useAuth } from "@/contexts/AuthContext";
 
-export interface ReportFormProps {
+interface ReportFormProps {
   children: React.ReactNode;
 }
 

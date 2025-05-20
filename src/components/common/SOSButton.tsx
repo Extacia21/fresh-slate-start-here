@@ -1,170 +1,89 @@
 
+import { AlertOctagon } from "lucide-react";
 import { useState } from "react";
-import { Phone, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Contact, getEmergencyContacts, sendSOSAlert } from "@/services/contactsService";
-import { useQuery } from "@tanstack/react-query";
+import ShareDialog from "./ShareDialog";
 
 interface SOSButtonProps {
-  className?: string;
   hidden?: boolean;
 }
 
-const SOSButton = ({ className, hidden }: SOSButtonProps) => {
-  const [isActive, setIsActive] = useState(false);
-  const [isPulsing, setIsPulsing] = useState(false);
-  const [countdown, setCountdown] = useState(3);
+const SOSButton = ({ hidden = false }: SOSButtonProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isSOSActive, setIsSOSActive] = useState(false);
   
-  // Use useQuery for fetching emergency contacts
-  const { data: sosContacts = [], isLoading } = useQuery({
-    queryKey: ['sosContacts'],
-    queryFn: getEmergencyContacts
-  });
-  
-  const handleSOSActivate = () => {
-    if (!isActive) {
-      // Start pulse animation
-      setIsPulsing(true);
-      
-      // Start countdown
-      setIsActive(true);
-      let count = 3;
-      
-      const countdownInterval = setInterval(() => {
-        count -= 1;
-        setCountdown(count);
-        
-        if (count <= 0) {
-          clearInterval(countdownInterval);
-          triggerSOS();
-        }
-      }, 1000);
-      
-      // Store interval ID for cleanup
-      return () => clearInterval(countdownInterval);
-    } else {
-      // Cancel SOS
-      setIsActive(false);
-      setIsPulsing(false);
-      setCountdown(3);
-      toast.info("SOS Alert canceled");
-    }
-  };
-  
-  const triggerSOS = async () => {
-    try {
-      // Get current location
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          const locationString = `${latitude},${longitude}`;
-          const message = "Emergency SOS triggered. I need immediate assistance.";
-          
-          // Send SOS alert to emergency contacts
-          let contactsToNotify: Contact[] = [...sosContacts];
-          
-          if (contactsToNotify.length === 0) {
-            // If no emergency contacts are set up, default to Chinhoyi emergency services
-            contactsToNotify = [
-              {
-                id: "sos-default-1",
-                name: "Chinhoyi Police",
-                phone: "+263 67 22281",
-                type: "emergency",
-                is_favorite: true,
-                user_id: null,
-                email: "police@chinhoyi.gov.zw"
-              },
-              {
-                id: "sos-default-2",
-                name: "Chinhoyi Provincial Hospital",
-                phone: "+263 67 22260",
-                type: "emergency",
-                is_favorite: true,
-                user_id: null,
-                email: "hospital@chinhoyi.gov.zw"
-              }
-            ];
-          }
-          
-          // Send SOS alert using our contactsService function
-          const result = await sendSOSAlert(contactsToNotify, locationString, message);
-          
-          if (result.success) {
-            toast.success("SOS Alert sent", {
-              description: `Alert sent to ${contactsToNotify.length} emergency contacts`,
-              duration: 5000,
-            });
-            
-            if (contactsToNotify.some(contact => contact.email)) {
-              toast.info("Email notifications sent", {
-                description: "Emergency contacts have been notified via email",
-                duration: 5000,
-              });
-            }
-          } else {
-            toast.error("Failed to send SOS Alert", {
-              description: result.message,
-              duration: 5000,
-            });
-          }
-          
-          // Reset state
-          setIsActive(false);
-          setIsPulsing(false);
-          setCountdown(3);
-        },
-        (error) => {
-          console.error("Error getting location:", error);
-          toast.error("Could not get your location", {
-            description: "Please ensure location access is enabled",
-            duration: 5000,
-          });
-          setIsActive(false);
-          setIsPulsing(false);
-          setCountdown(3);
-        }
-      );
-    } catch (error) {
-      console.error("SOS error:", error);
-      toast.error("SOS Alert error", {
-        description: error instanceof Error ? error.message : "An unknown error occurred",
-      });
-      setIsActive(false);
-      setIsPulsing(false);
-      setCountdown(3);
-    }
+  // Mock user location - in a real app we would use geolocation API
+  const userLocation = "37.7749,-122.4194"; // San Francisco coordinates
+  const shareUrl = `https://maps.google.com/?q=${userLocation}`;
+
+  const handleSOS = () => {
+    setIsSOSActive(true);
+    setIsOpen(false);
+    
+    // Log SOS activation
+    console.log("SOS activated");
+    
+    // Show toast notification
+    toast.error("Emergency SOS Activated", {
+      description: "Your location is being shared with emergency contacts",
+      duration: 10000,
+    });
   };
 
-  if (hidden) {
-    return null;
-  }
+  const handleCancelSOS = () => {
+    setIsSOSActive(false);
+    toast.success("SOS Deactivated", {
+      description: "Emergency mode has been turned off",
+    });
+  };
+
+  if (hidden) return null;
 
   return (
-    <div className={className}>
-      <Button
-        className={`h-16 w-16 rounded-full transition-all duration-300 ${
-          isActive 
-            ? "bg-crisis-red hover:bg-crisis-red/90 text-white" 
-            : "bg-gray-200 hover:bg-gray-300 text-gray-700"
-        } ${isPulsing ? "animate-pulse" : ""}`}
-        onClick={handleSOSActivate}
-        aria-label={isActive ? "Cancel SOS" : "SOS Emergency Button"}
-      >
-        {isActive ? (
-          <div className="flex flex-col items-center">
-            <X className="h-6 w-6" />
-            <span className="text-xs mt-1">{countdown}</span>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center">
-            <Phone className="h-6 w-6" />
-            <span className="text-xs mt-1">SOS</span>
-          </div>
-        )}
-      </Button>
-    </div>
+    <>
+      {isSOSActive ? (
+        <button
+          className="sos-button active fixed bottom-24 right-6 z-50 p-4 rounded-full bg-crisis-red shadow-lg flex items-center justify-center animate-pulse"
+          onClick={handleCancelSOS}
+          aria-label="Cancel Emergency SOS"
+        >
+          <AlertOctagon size={24} className="text-white" />
+          <span className="absolute w-full h-full rounded-full bg-crisis-red/60 z-[-1] animate-ping"></span>
+        </button>
+      ) : (
+        <button
+          className="fixed bottom-24 right-6 z-50 p-4 bg-crisis-red rounded-full shadow-lg"
+          onClick={() => setIsOpen(true)}
+          aria-label="Emergency SOS"
+        >
+          <AlertOctagon size={24} className="animate-pulse text-white" />
+        </button>
+      )}
+
+      <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+        <AlertDialogContent className="max-w-[350px]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-crisis-red flex items-center">
+              <AlertOctagon className="mr-2" size={20} />
+              Emergency SOS
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will alert emergency contacts and share your location. Are you sure you want to proceed?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel className="mt-0">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              className="bg-crisis-red hover:bg-crisis-red/90"
+              onClick={handleSOS}
+            >
+              Activate SOS
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
 

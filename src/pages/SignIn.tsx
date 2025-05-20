@@ -16,14 +16,6 @@ const SignIn = () => {
   const navigate = useNavigate();
   const { signIn, user } = useAuth();
 
-  // Check if onboarding has been completed
-  useEffect(() => {
-    const hasSeenOnboarding = localStorage.getItem("hasSeenOnboarding");
-    if (hasSeenOnboarding !== "true") {
-      navigate("/onboarding");
-    }
-  }, [navigate]);
-
   // Redirect if user is already authenticated
   useEffect(() => {
     if (user) {
