@@ -3,14 +3,15 @@ import { useState } from "react";
 import { Phone, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Contact, getEmergencyContacts } from "@/services/contactsService";
+import { Contact, getEmergencyContacts, sendSOSAlert } from "@/services/contactsService";
 import { useQuery } from "@tanstack/react-query";
 
 interface SOSButtonProps {
   className?: string;
+  hidden?: boolean;
 }
 
-const SOSButton = ({ className }: SOSButtonProps) => {
+const SOSButton = ({ className, hidden }: SOSButtonProps) => {
   const [isActive, setIsActive] = useState(false);
   const [isPulsing, setIsPulsing] = useState(false);
   const [countdown, setCountdown] = useState(3);
@@ -136,6 +137,10 @@ const SOSButton = ({ className }: SOSButtonProps) => {
     }
   };
 
+  if (hidden) {
+    return null;
+  }
+
   return (
     <div className={className}>
       <Button
@@ -164,12 +169,3 @@ const SOSButton = ({ className }: SOSButtonProps) => {
 };
 
 export default SOSButton;
-
-// Function to mock sending an SOS alert
-async function sendSOSAlert(contacts: Contact[], location: string, message: string) {
-  console.log(`Sending SOS to ${contacts.length} contacts at location ${location}: ${message}`);
-  
-  // In a real app, this would make API calls to send SMS and emails
-  // For now, we'll simulate success
-  return { success: true, message: "Alert sent successfully" };
-}

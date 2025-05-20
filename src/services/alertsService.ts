@@ -1,8 +1,7 @@
 
-// Update alertsService.ts to fix the type issues
-
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { format, formatDistanceToNow } from "date-fns";
 
 // Define proper types for the alerts
 export type AlertSeverity = "critical" | "high" | "medium" | "low";
@@ -22,20 +21,58 @@ export interface Alert {
   user_id?: string;
   is_resolved?: boolean;
   category?: string;
-  source?: string; // Added source property
-  status?: string; // Added status property
+  source?: string;
+  status?: string;
   updates?: Array<{
     id: string;
     text: string;
     timestamp: string;
   }>;
-  // Map over to the Supabase fields
-  alert_type?: AlertType;
-  start_time?: string;
-  end_time?: string;
-  created_by?: string;
-  radius?: number;
 }
+
+// Define color schemes for different alert types
+export const alertTypeColors = {
+  fire: {
+    bg: "bg-red-100",
+    text: "text-red-600",
+    border: "border-red-200"
+  },
+  police: {
+    bg: "bg-blue-100",
+    text: "text-blue-600",
+    border: "border-blue-200"
+  },
+  health: {
+    bg: "bg-green-100",
+    text: "text-green-600",
+    border: "border-green-200"
+  },
+  weather: {
+    bg: "bg-orange-100",
+    text: "text-orange-600",
+    border: "border-orange-200"
+  },
+  other: {
+    bg: "bg-gray-100",
+    text: "text-gray-600",
+    border: "border-gray-200"
+  }
+};
+
+// Format time to relative format (e.g., 5 minutes ago)
+export const formatRelativeTime = (timestamp: string): string => {
+  try {
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) {
+      return timestamp;
+    }
+
+    return formatDistanceToNow(date, { addSuffix: true });
+  } catch (error) {
+    console.error("Error formatting time:", error);
+    return timestamp;
+  }
+};
 
 // Get all alerts
 export const useGetAllAlerts = () => {
@@ -52,7 +89,7 @@ export const useGetAllAlerts = () => {
       }
 
       // Transform data to match our Alert interface
-      return (data || []).map((alert) => {
+      return (data || []).map((alert: any) => {
         return {
           id: alert.id,
           title: alert.title || `${alert.alert_type} Alert`,
@@ -78,6 +115,46 @@ export const useGetAllAlerts = () => {
 
 // Alias for backward compatibility
 export const useGetAlerts = useGetAllAlerts;
+
+// Get recent alerts - limit by count
+export const useGetRecentAlerts = (limit: number = 5) => {
+  return useQuery({
+    queryKey: ["recentAlerts", limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("alerts")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Transform data to match our Alert interface
+      return (data || []).map((alert: any) => {
+        return {
+          id: alert.id,
+          title: alert.title || `${alert.alert_type} Alert`,
+          description: alert.description,
+          location: alert.location || "Chinhoyi, Zimbabwe",
+          type: alert.alert_type || "other",
+          severity: alert.severity || "medium",
+          created_at: alert.created_at,
+          updated_at: alert.updated_at || alert.created_at,
+          latitude: alert.latitude,
+          longitude: alert.longitude,
+          is_resolved: alert.is_resolved || false,
+          category: alert.category || alert.alert_type,
+          source: alert.source || "System",
+          status: alert.status || "Active",
+          user_id: alert.created_by || alert.user_id,
+          updates: alert.updates || []
+        } as Alert;
+      });
+    },
+  });
+};
 
 // Get a single alert by ID
 export const useGetAlert = (id: string | undefined) => {
@@ -124,6 +201,9 @@ export const useGetAlert = (id: string | undefined) => {
   });
 };
 
+// For backward compatibility
+export const useGetAlertById = useGetAlert;
+
 // Create a new alert
 export const createAlert = async (alertData: Partial<Alert>): Promise<Alert> => {
   try {
@@ -138,8 +218,8 @@ export const createAlert = async (alertData: Partial<Alert>): Promise<Alert> => 
       longitude: alertData.longitude || 0,
       created_by: alertData.user_id,
       start_time: alertData.created_at || new Date().toISOString(),
-      end_time: alertData.end_time || new Date(Date.now() + 86400000).toISOString(), // 24 hours later
-      radius: alertData.radius || 5000, // Default 5km radius
+      end_time: new Date(Date.now() + 86400000).toISOString(), // 24 hours later
+      radius: 5000, // Default 5km radius
       status: alertData.status || "Active",
       source: alertData.source || "User",
       is_resolved: alertData.is_resolved || false,
@@ -232,9 +312,38 @@ export const updateAlert = async (id: string, alertData: Partial<Alert>): Promis
   }
 };
 
+// Subscribe to new alerts - this is a hook to simulate real-time alerts
+export const useSubscribeToAlerts = (onNewAlert: (alert: Alert) => void) => {
+  // In a real app, this would use Supabase real-time subscriptions
+  // For now, we'll simulate with a setTimeout
+  
+  // This is a dummy implementation to simulate real-time updates
+  useQuery({
+    queryKey: ["alertSubscription"],
+    queryFn: async () => {
+      // This is just a placeholder function
+      return true;
+    },
+    refetchInterval: 30000, // Refetch every 30 seconds to simulate new alerts
+    enabled: !!onNewAlert,
+  });
+
+  // Return unsubscribe function
+  return () => {
+    // Cleanup if needed
+    console.log("Unsubscribed from alerts");
+  };
+};
+
 export default {
   useGetAllAlerts,
+  useGetAlerts,
   useGetAlert,
+  useGetAlertById,
+  useGetRecentAlerts,
+  useSubscribeToAlerts,
   createAlert,
   updateAlert,
+  alertTypeColors,
+  formatRelativeTime
 };

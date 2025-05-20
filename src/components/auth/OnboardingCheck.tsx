@@ -1,50 +1,49 @@
 
-import React, { ReactNode, useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import React, { useEffect, useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
 interface OnboardingCheckProps {
-  children: ReactNode;
+  children: React.ReactNode;
 }
 
 const OnboardingCheck = ({ children }: OnboardingCheckProps) => {
-  const { user } = useAuth();
-  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const checkOnboardingStatus = async () => {
-      if (!user) {
-        setIsLoading(false);
-        return;
-      }
-
+    async function checkOnboardingStatus() {
       try {
+        // Get current user
+        const { data: userData } = await supabase.auth.getUser();
+        if (!userData.user) {
+          navigate("/signin");
+          return;
+        }
+
         // Check if user has completed onboarding
-        const { data: profile, error } = await supabase
+        const { data, error } = await supabase
           .from("profiles")
-          .select("onboarding_completed")
-          .eq("id", user.id)
+          .select("*")
+          .eq("id", userData.user.id)
           .single();
 
-        if (error) throw error;
-
-        // Set onboarding status
-        setHasCompletedOnboarding(profile?.onboarding_completed || false);
+        // If profile doesn't exist or is_onboarded is false, redirect to onboarding
+        if (error || !data || !data.is_onboarded) {
+          setNeedsOnboarding(true);
+        }
       } catch (error) {
         console.error("Error checking onboarding status:", error);
-        // Default to false if there's an error
-        setHasCompletedOnboarding(false);
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
-    };
+    }
 
     checkOnboardingStatus();
-  }, [user]);
+  }, [navigate]);
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -52,12 +51,10 @@ const OnboardingCheck = ({ children }: OnboardingCheckProps) => {
     );
   }
 
-  // Redirect to onboarding if not completed
-  if (hasCompletedOnboarding === false) {
+  if (needsOnboarding) {
     return <Navigate to="/onboarding" replace />;
   }
 
-  // Otherwise, render children
   return <>{children}</>;
 };
 

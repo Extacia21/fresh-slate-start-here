@@ -1,6 +1,8 @@
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
 
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
+// Define Contact types
 export type ContactType = "emergency" | "personal" | "service";
 
 export interface Contact {
@@ -11,268 +13,239 @@ export interface Contact {
   relationship?: string;
   type: ContactType;
   is_favorite: boolean;
-  user_id?: string | null;
+  user_id: string | null;
   created_at?: string;
 }
 
-// Get all contacts for the current user
-export const getContacts = async (): Promise<Contact[]> => {
-  const { data: userData } = await supabase.auth.getUser();
-  const userId = userData.user?.id;
-
-  if (!userId) {
-    throw new Error("User not authenticated");
-  }
-
-  const { data, error } = await supabase
-    .from("contacts")
-    .select("*")
-    .eq("user_id", userId)
-    .order("is_favorite", { ascending: false })
-    .order("name");
-
-  if (error) {
-    throw error;
-  }
-
-  // Ensure returned data conforms to Contact type
-  return (data || []).map(contact => ({
-    ...contact,
-    // Make sure type is one of the valid ContactType values
-    type: (contact.type === "emergency" || contact.type === "personal" || contact.type === "service") 
-      ? contact.type as ContactType 
-      : "personal" as ContactType
-  }));
+// Get all contacts
+export const useGetContacts = () => {
+  return useQuery({
+    queryKey: ["contacts"],
+    queryFn: async () => {
+      const { data: user } = await supabase.auth.getUser();
+      
+      if (!user.user) {
+        throw new Error("User not authenticated");
+      }
+      
+      const { data, error } = await supabase
+        .from("contacts")
+        .select("*")
+        .eq("user_id", user.user.id)
+        .order("name");
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      // Transform data to match our Contact interface
+      return (data || []).map((contact) => {
+        return {
+          ...contact,
+          type: contact.type as ContactType
+        } as Contact;
+      });
+    },
+  });
 };
 
-// Get emergency contacts for the current user
+// Get emergency contacts
 export const getEmergencyContacts = async (): Promise<Contact[]> => {
-  const { data: userData } = await supabase.auth.getUser();
-  const userId = userData.user?.id;
-
-  if (!userId) {
-    throw new Error("User not authenticated");
+  try {
+    const { data: user } = await supabase.auth.getUser();
+    
+    if (!user.user) {
+      console.warn("User not authenticated, returning empty contacts list");
+      return [];
+    }
+    
+    const { data, error } = await supabase
+      .from("contacts")
+      .select("*")
+      .eq("user_id", user.user.id)
+      .eq("type", "emergency")
+      .order("name");
+    
+    if (error) {
+      throw new Error(error.message);
+    }
+    
+    // Transform data to match our Contact interface
+    return (data || []).map((contact) => {
+      return {
+        ...contact,
+        type: contact.type as ContactType
+      } as Contact;
+    });
+  } catch (error) {
+    console.error("Error fetching emergency contacts:", error);
+    return [];
   }
-
-  const { data, error } = await supabase
-    .from("contacts")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("type", "emergency")
-    .order("is_favorite", { ascending: false })
-    .order("name");
-
-  if (error) {
-    throw error;
-  }
-
-  // Ensure returned data conforms to Contact type
-  return (data || []).map(contact => ({
-    ...contact,
-    type: "emergency" as ContactType
-  }));
 };
 
-// Send SOS alert to emergency contacts
+// Send SOS alert function
 export const sendSOSAlert = async (
   contacts: Contact[], 
   location: string, 
   message: string
 ): Promise<{ success: boolean; message: string }> => {
   try {
-    // In a real application, this function would:
-    // 1. Send SMS to each contact's phone number
-    // 2. Send emails to contacts with email addresses
-    // 3. Record the SOS event in the database
+    const { data: user } = await supabase.auth.getUser();
     
-    console.log(`Sending SOS to ${contacts.length} contacts at location ${location}: ${message}`);
+    if (!user.user) {
+      return { success: false, message: "User not authenticated" };
+    }
     
-    // Record the SOS event in the database
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData.user?.id;
-
-    if (userId) {
-      // Log SOS event
-      const { error } = await supabase
-        .from("sos_events")
-        .insert({
-          user_id: userId,
-          location,
-          message,
-          contacts_notified: contacts.length,
-          status: "sent",
-        });
-
-      if (error) {
-        console.error("Failed to record SOS event:", error);
+    // Log the SOS event to the database
+    const { data: sosEvent, error: sosError } = await supabase
+      .from("sos_history")
+      .insert({
+        user_id: user.user.id,
+        location,
+        message,
+        contact_count: contacts.length,
+        created_at: new Date().toISOString(),
+        status: "sent"
+      })
+      .select()
+      .single();
+    
+    if (sosError) {
+      console.error("Error logging SOS event:", sosError);
+      // Continue even if logging fails
+    }
+    
+    // In a real app, this would send SMS and emails to contacts
+    // For now, we'll just log them
+    console.log(`SOS Alert to ${contacts.length} contacts: ${message} at ${location}`);
+    
+    contacts.forEach(contact => {
+      console.log(`Would send alert to ${contact.name} via ${contact.phone}`);
+      if (contact.email) {
+        console.log(`Would also email ${contact.email}`);
       }
-    }
-
-    // Send emails to contacts with email addresses
-    const emailContacts = contacts.filter(contact => contact.email);
-    if (emailContacts.length > 0) {
-      // In a real application, we would use a serverless function or API 
-      // to send emails to each contact
-      console.log(`Sending emails to ${emailContacts.length} contacts`);
-    }
+    });
     
-    return { success: true, message: "SOS alert sent successfully" };
+    return { 
+      success: true, 
+      message: `Alert sent to ${contacts.length} emergency contacts` 
+    };
   } catch (error) {
     console.error("Error sending SOS alert:", error);
     return { 
       success: false, 
-      message: error instanceof Error ? error.message : "An unknown error occurred" 
+      message: error instanceof Error ? error.message : "Unknown error occurred" 
     };
   }
 };
 
-// Get a contact by ID
-export const getContact = async (id: string): Promise<Contact> => {
-  const { data, error } = await supabase
-    .from("contacts")
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  // Ensure returned data conforms to Contact type
-  return {
-    ...data,
-    // Make sure type is one of the valid ContactType values
-    type: (data.type === "emergency" || data.type === "personal" || data.type === "service") 
-      ? data.type 
-      : "personal" as ContactType
-  };
-};
-
 // Create a new contact
 export const createContact = async (contactData: Omit<Contact, "id" | "created_at" | "user_id">): Promise<Contact> => {
-  const { data: userData } = await supabase.auth.getUser();
-  const userId = userData.user?.id;
-
-  if (!userId) {
+  const { data: user } = await supabase.auth.getUser();
+  
+  if (!user.user) {
     throw new Error("User not authenticated");
   }
-
-  // Ensure the type is one of the valid ContactType values
-  const validType: ContactType = 
-    (contactData.type === "emergency" || contactData.type === "personal" || contactData.type === "service") 
-      ? contactData.type 
-      : "personal";
-
+  
   const { data, error } = await supabase
     .from("contacts")
     .insert({
       ...contactData,
-      type: validType,
-      user_id: userId,
+      user_id: user.user.id,
+      created_at: new Date().toISOString(),
     })
     .select()
     .single();
-
+  
   if (error) {
     throw error;
   }
-
+  
   return {
     ...data,
-    type: validType
-  };
+    type: data.type as ContactType
+  } as Contact;
 };
 
-// Update an existing contact
-export const updateContact = async (id: string, contactData: Partial<Contact>): Promise<Contact> => {
-  // Ensure the type is one of the valid ContactType values if provided
-  const validData = { ...contactData };
-  if (validData.type && 
-      validData.type !== "emergency" && 
-      validData.type !== "personal" && 
-      validData.type !== "service") {
-    validData.type = "personal" as ContactType;
-  }
-
-  const { data, error } = await supabase
-    .from("contacts")
-    .update(validData)
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  // Ensure returned data conforms to Contact type
-  return {
-    ...data,
-    // Make sure type is one of the valid ContactType values
-    type: (data.type === "emergency" || data.type === "personal" || data.type === "service") 
-      ? data.type 
-      : "personal" as ContactType
-  };
+// Update contact hook
+export const useUpdateContact = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, contact }: { id: string; contact: Partial<Contact> }) => {
+      const { data, error } = await supabase
+        .from("contacts")
+        .update(contact)
+        .eq("id", id)
+        .select()
+        .single();
+      
+      if (error) {
+        throw error;
+      }
+      
+      return {
+        ...data,
+        type: data.type as ContactType
+      } as Contact;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contacts"] });
+    },
+  });
 };
 
-// Delete a contact
+// Delete contact
 export const deleteContact = async (id: string): Promise<void> => {
   const { error } = await supabase
     .from("contacts")
     .delete()
     .eq("id", id);
-
+  
   if (error) {
     throw error;
   }
 };
 
-// Toggle favorite status
-export const toggleFavorite = async (id: string, isFavorite: boolean): Promise<Contact> => {
-  const { data, error } = await supabase
-    .from("contacts")
-    .update({ is_favorite: isFavorite })
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  // Ensure returned data conforms to Contact type
-  return {
-    ...data,
-    // Make sure type is one of the valid ContactType values
-    type: (data.type === "emergency" || data.type === "personal" || data.type === "service") 
-      ? data.type 
-      : "personal" as ContactType
-  };
-};
-
-// Hook for getting contacts
-export const useGetContacts = () => {
+// Get favorite contacts
+export const useGetFavoriteContacts = () => {
   return useQuery({
-    queryKey: ['contacts'],
-    queryFn: getContacts
+    queryKey: ["favoriteContacts"],
+    queryFn: async () => {
+      const { data: user } = await supabase.auth.getUser();
+      
+      if (!user.user) {
+        throw new Error("User not authenticated");
+      }
+      
+      const { data, error } = await supabase
+        .from("contacts")
+        .select("*")
+        .eq("user_id", user.user.id)
+        .eq("is_favorite", true)
+        .order("name");
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      return data.map((contact) => {
+        return {
+          ...contact,
+          type: contact.type as ContactType
+        } as Contact;
+      });
+    },
   });
 };
 
-// Hook for getting SOS contacts (emergency contacts)
-export const useGetSOSContacts = () => {
-  return useQuery({
-    queryKey: ['sosContacts'],
-    queryFn: getEmergencyContacts
-  });
-};
-
+// Export everything needed
 export default {
-  getContacts,
+  useGetContacts,
   getEmergencyContacts,
-  getContact,
   createContact,
-  updateContact,
+  useUpdateContact,
   deleteContact,
-  toggleFavorite,
-  sendSOSAlert,
+  useGetFavoriteContacts,
+  sendSOSAlert
 };
