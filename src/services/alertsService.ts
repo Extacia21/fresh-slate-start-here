@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AlertTriangle, CloudRain, Shield, Info } from "lucide-react";
 
 export interface Alert {
-  id: number;
+  id: string | number;
   title: string;
   description: string;
   location: string;
@@ -141,17 +141,43 @@ export function formatRelativeTime(timestamp: string): string {
 // Add a new alert to the system
 export const addAlert = async (alert: Omit<Alert, "id" | "created_at">): Promise<Alert> => {
   try {
+    // Map from our alert model to the database model
+    const dbAlert = {
+      alert_type: alert.type as "fire" | "police" | "health" | "weather" | "other",
+      description: alert.description,
+      title: alert.title,
+      severity: alert.severity,
+      radius: 5000, // Default radius in meters
+      latitude: alert.latitude || 0,
+      longitude: alert.longitude || 0,
+      status: alert.is_resolved ? "resolved" : "active",
+      created_by: alert.user_id || "system",
+      end_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Default 24 hour alert
+    };
+    
     const { data, error } = await supabase
       .from('alerts')
-      .insert({
-        ...alert,
-        created_at: new Date().toISOString()
-      })
+      .insert(dbAlert)
       .select()
       .single();
     
     if (error) throw error;
-    return data;
+    
+    // Map from the database model back to our alert model
+    return {
+      id: data.id,
+      title: data.title,
+      description: data.description,
+      location: alert.location, // Use original location string
+      type: data.alert_type,
+      severity: data.severity,
+      created_at: data.created_at,
+      is_resolved: data.status === "resolved",
+      latitude: data.latitude,
+      longitude: data.longitude,
+      user_id: data.created_by,
+      category: data.alert_type
+    };
   } catch (error) {
     console.error("Error adding alert:", error);
     throw error;
@@ -206,7 +232,10 @@ export const useGetAlertById = (id: number | string | undefined) => {
         // For now, generate a specific mock alert for Chinhoyi
         const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
         const alerts = generateChinhoyiAlerts(20);
-        const alert = alerts.find(a => a.id === numericId);
+        const alert = alerts.find(a => {
+          const alertId = typeof a.id === 'string' ? parseInt(a.id, 10) : a.id;
+          return alertId === numericId;
+        });
         return alert || null;
       } catch (error) {
         console.error(`Error fetching alert with ID ${id}:`, error);

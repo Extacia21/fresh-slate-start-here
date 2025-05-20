@@ -22,7 +22,7 @@ const AddContactForm = ({ onClose, onAddContact }: AddContactFormProps) => {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [relationship, setRelationship] = useState("");
-  const [type, setType] = useState("personal");
+  const [type, setType] = useState<"personal" | "emergency" | "service">("personal");
   const [isFavorite, setIsFavorite] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -118,7 +118,10 @@ const AddContactForm = ({ onClose, onAddContact }: AddContactFormProps) => {
         
         <div className="space-y-2">
           <Label htmlFor="type">Contact Type</Label>
-          <Select value={type} onValueChange={setType}>
+          <Select 
+            value={type} 
+            onValueChange={(value: "personal" | "emergency" | "service") => setType(value)}
+          >
             <SelectTrigger id="type">
               <SelectValue placeholder="Contact type" />
             </SelectTrigger>

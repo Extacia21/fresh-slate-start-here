@@ -9,7 +9,7 @@ const chinhoyiEmergencyContacts = [
     id: "default-emergency-1",
     name: "Chinhoyi Police",
     phone: "+263 67 22281",
-    type: "emergency",
+    type: "emergency" as const,
     is_favorite: true,
     user_id: null,
   },
@@ -17,7 +17,7 @@ const chinhoyiEmergencyContacts = [
     id: "default-emergency-2",
     name: "Chinhoyi Fire Department",
     phone: "+263 67 22789",
-    type: "emergency",
+    type: "emergency" as const,
     is_favorite: true,
     user_id: null,
   },
@@ -25,7 +25,7 @@ const chinhoyiEmergencyContacts = [
     id: "default-emergency-3",
     name: "Chinhoyi Provincial Hospital",
     phone: "+263 67 22260",
-    type: "emergency",
+    type: "emergency" as const,
     is_favorite: true,
     user_id: null,
   },
@@ -33,7 +33,7 @@ const chinhoyiEmergencyContacts = [
     id: "default-emergency-4",
     name: "Chinhoyi Ambulance Services",
     phone: "+263 67 22123",
-    type: "emergency",
+    type: "emergency" as const,
     is_favorite: true,
     user_id: null,
   },
@@ -41,7 +41,7 @@ const chinhoyiEmergencyContacts = [
     id: "default-emergency-5",
     name: "Zimbabwe Road Emergency Services",
     phone: "+263 71 9222 236",
-    type: "emergency",
+    type: "emergency" as const,
     is_favorite: true,
     user_id: null,
   }
@@ -78,9 +78,15 @@ export const useGetContacts = () => {
         .eq('user_id', user.id);
       
       if (error) throw error;
+
+      // Convert any string type to proper enum type
+      const typedUserContacts = userContacts.map(contact => ({
+        ...contact,
+        type: contact.type as "personal" | "emergency" | "service"
+      }));
       
       // Merge user contacts with default emergency contacts
-      return [...chinhoyiEmergencyContacts, ...userContacts];
+      return [...chinhoyiEmergencyContacts, ...typedUserContacts];
     },
     enabled: true,
   });
@@ -105,7 +111,10 @@ export const useCreateContact = () => {
         .single();
       
       if (error) throw new Error(error.message);
-      return data;
+      return {
+        ...data,
+        type: data.type as "personal" | "emergency" | "service"
+      };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts', user?.id] });
@@ -130,14 +139,20 @@ export const useUpdateContact = () => {
       
       const { data, error } = await supabase
         .from('contacts')
-        .update(contact)
-        .eq('id', contact.id)
+        .update({
+          ...contact,
+          id: typeof contact.id === 'number' ? contact.id : contact.id
+        })
+        .eq('id', typeof contact.id === 'number' ? contact.id.toString() : contact.id)
         .eq('user_id', user.id) // ensure user can only update their own contacts
         .select()
         .single();
       
       if (error) throw new Error(error.message);
-      return data;
+      return {
+        ...data,
+        type: data.type as "personal" | "emergency" | "service"
+      };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts', user?.id] });
@@ -162,7 +177,7 @@ export const useDeleteContact = () => {
       const { error } = await supabase
         .from('contacts')
         .delete()
-        .eq('id', id)
+        .eq('id', typeof id === 'number' ? id.toString() : id)
         .eq('user_id', user.id); // ensure user can only delete their own contacts
       
       if (error) throw new Error(error.message);
@@ -190,7 +205,11 @@ export const useGetSOSContacts = () => {
         .eq('type', 'emergency');
       
       if (error) throw error;
-      return data || [];
+      
+      return data.map(contact => ({
+        ...contact,
+        type: contact.type as "personal" | "emergency" | "service"
+      }));
     },
     enabled: !!user,
   });

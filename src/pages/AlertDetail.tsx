@@ -14,22 +14,23 @@ import LocationMap from "@/components/common/LocationMap";
 import ShareDialog from "@/components/common/ShareDialog";
 import { useGetAlertById, formatRelativeTime, alertTypeColors } from "@/services/alertsService";
 
+interface Update {
+  time: string;
+  content: string;
+}
+
 const AlertDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { data: alert, isLoading, error } = useGetAlertById(id);
   const navigate = useNavigate();
-  const [liveUpdates, setLiveUpdates] = useState<{ time: string; content: string }[]>([]);
+  const [liveUpdates, setLiveUpdates] = useState<Update[]>([]);
   const [showShareDialog, setShowShareDialog] = useState(false);
 
   // Initialize any existing updates when the alert loads
   useEffect(() => {
     if (alert) {
-      // If alert has updates field, use it, otherwise start with empty array
-      const initialUpdates = alert.updates ? 
-        (Array.isArray(alert.updates) ? alert.updates : []) : 
-        [];
-      
-      setLiveUpdates(initialUpdates);
+      // Start with empty array of updates
+      setLiveUpdates([]);
     }
   }, [alert]);
 
@@ -196,7 +197,7 @@ const AlertDetail = () => {
       <div className={`p-4 rounded-lg mb-6 ${getSeverityColor(alert.severity)} bg-opacity-10 border border-opacity-30 ${getSeverityColor(alert.severity).replace('bg-', 'border-')}`}>
         <div className="flex items-center mb-2">
           <div className={`p-2 rounded-full ${typeColor.bg} mr-3`}>
-            <Icon className={`h-6 w-6 ${typeColor.icon}`} />
+            <Icon className={`h-6 w-6 ${typeColor.text}`} />
           </div>
           <div>
             <h1 className="text-xl font-bold">{alert.title}</h1>
@@ -218,9 +219,9 @@ const AlertDetail = () => {
               <span>{alert.location}</span>
             </div>
           )}
-          {alert.status && (
+          {alert.is_resolved !== undefined && (
             <div className="w-full mt-2 pt-2 border-t border-current border-opacity-20">
-              <span className="font-medium capitalize">Status: {alert.status}</span>
+              <span className="font-medium capitalize">Status: {alert.is_resolved ? "Resolved" : "Active"}</span>
             </div>
           )}
         </div>
@@ -235,7 +236,7 @@ const AlertDetail = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <LocationMap location={alert.location} />
+            <LocationMap location={alert.location} className="h-48" />
           </CardContent>
         </Card>
       )}
@@ -331,12 +332,12 @@ const AlertDetail = () => {
           </CardContent>
         </Card>
 
-        {alert.source && (
+        {alert.category && (
           <div className="bg-muted p-4 rounded-lg">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <Info className="h-4 w-4 mr-2 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Source: {alert.source}</span>
+                <span className="text-sm text-muted-foreground">Category: {alert.category}</span>
               </div>
               <Button variant="ghost" size="sm">
                 <MessageCircle className="h-4 w-4 mr-2" />
