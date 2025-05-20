@@ -8,17 +8,23 @@ export interface ProfileData {
   id?: string;
   first_name?: string;
   last_name?: string;
+  display_name?: string;
   phone?: string;
   email?: string;
   address?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
   date_of_birth?: string;
   gender?: string;
   blood_type?: string;
-  medical_conditions?: string[];
-  medications?: string[];
+  medical_conditions?: string[] | string;
+  medications?: string[] | string;
   emergency_notes?: string;
-  allergies?: string[];
+  allergies?: string[] | string;
   avatar_url?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -46,6 +52,7 @@ export const ProfileDataProvider = ({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (data) {
+      // Support for both string and string[] types for medical_conditions, medications, and allergies
       setProfileData(data);
     }
   }, [data]);

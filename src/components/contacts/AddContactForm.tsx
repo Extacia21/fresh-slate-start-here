@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -15,6 +16,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -44,9 +46,11 @@ const formSchema = z.object({
 export default function AddContactForm({
   open,
   onClose,
+  onAddContact,
 }: {
   open: boolean;
   onClose: () => void;
+  onAddContact?: (newContact: any) => void;
 }) {
   const { toast } = useToast();
   const createContact = useCreateContact();
@@ -80,6 +84,18 @@ export default function AddContactForm({
         title: "Contact added",
         description: `${values.name} has been added to your contacts.`,
       });
+      
+      // Call the onAddContact callback if provided
+      if (onAddContact) {
+        onAddContact({
+          name: values.name,
+          phone: values.phone,
+          email: values.email || undefined,
+          type: values.type,
+          relationship: values.relationship || undefined,
+          is_favorite: values.is_favorite,
+        });
+      }
       
       form.reset();
       onClose();

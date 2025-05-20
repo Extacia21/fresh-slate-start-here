@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Phone, Plus, Search, Star, Users, Mail, Shield, Building, Heart } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -275,6 +274,7 @@ const Contacts = () => {
 
       <Dialog open={isAddContactOpen} onOpenChange={setIsAddContactOpen}>
         <AddContactForm 
+          open={isAddContactOpen}
           onClose={() => setIsAddContactOpen(false)} 
           onAddContact={addNewContact} 
         />
