@@ -43,6 +43,24 @@ export const formatRelativeTime = (timestamp: string): string => {
   }
 };
 
+// Define the database Alert type - matching the actual database schema
+type DatabaseAlert = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  title: string;
+  description: string;
+  severity: "low" | "medium" | "high" | "critical";
+  alert_type: "police" | "fire" | "health" | "weather" | "other";
+  start_time: string;
+  end_time: string | null;
+  created_by: string | null;
+  latitude: number;
+  longitude: number;
+  radius: number;
+  source: string | null;
+};
+
 // Define the Alert interface with all required properties
 export interface Alert {
   id: string;
@@ -54,20 +72,34 @@ export interface Alert {
   alert_type: "police" | "fire" | "health" | "weather" | "other";
   type?: "police" | "fire" | "health" | "weather" | "other"; // Add type as an optional alias for alert_type
   start_time: string;
-  end_time: string;
-  created_by: string;
+  end_time: string | null;
+  created_by: string | null;
   latitude: number;
   longitude: number;
-  // Add all the properties that were missing
+  radius: number;
+  source?: string | null;
+  // Additional properties we compute or add
   location?: string;
   status?: string;
   is_resolved?: boolean;
   category?: string;
   user_id?: string;
   updates?: any[];
-  // Include radius for database compatibility
-  radius?: number;
 }
+
+// Helper function to transform database alert to our Alert interface
+const transformDatabaseAlert = (dbAlert: DatabaseAlert): Alert => {
+  return {
+    ...dbAlert,
+    location: `${dbAlert.latitude}, ${dbAlert.longitude}`,
+    status: 'active',
+    is_resolved: false,
+    category: dbAlert.alert_type,
+    user_id: dbAlert.created_by,
+    updates: [],
+    type: dbAlert.alert_type  // Add type as alias for alert_type
+  };
+};
 
 // Hook to get all alerts
 export const useGetAllAlerts = () => {
@@ -81,17 +113,7 @@ export const useGetAllAlerts = () => {
 
       if (error) throw error;
       
-      return data.map(alert => ({
-        ...alert,
-        location: alert.location || `${alert.latitude}, ${alert.longitude}`,
-        status: alert.status || 'active',
-        is_resolved: alert.is_resolved || false,
-        category: alert.category || alert.alert_type,
-        user_id: alert.user_id || alert.created_by,
-        updates: alert.updates || [],
-        // Add type as an alias for alert_type for backward compatibility
-        type: alert.alert_type
-      })) as Alert[];
+      return data.map(alert => transformDatabaseAlert(alert as DatabaseAlert));
     }
   });
 };
@@ -109,17 +131,7 @@ export const useGetAlertById = (id: string) => {
 
       if (error) throw error;
       
-      return {
-        ...data,
-        location: data.location || `${data.latitude}, ${data.longitude}`,
-        status: data.status || 'active',
-        is_resolved: data.is_resolved || false,
-        category: data.category || data.alert_type,
-        user_id: data.user_id || data.created_by,
-        updates: data.updates || [],
-        // Add type as an alias for alert_type
-        type: data.alert_type
-      } as Alert;
+      return transformDatabaseAlert(data as DatabaseAlert);
     },
     enabled: !!id
   });
@@ -138,17 +150,7 @@ export const useGetAlertsByType = (type: Alert['alert_type']) => {
 
       if (error) throw error;
       
-      return data.map(alert => ({
-        ...alert,
-        location: alert.location || `${alert.latitude}, ${alert.longitude}`,
-        status: alert.status || 'active',
-        is_resolved: alert.is_resolved || false,
-        category: alert.category || alert.alert_type,
-        user_id: alert.user_id || alert.created_by,
-        updates: alert.updates || [],
-        // Add type as an alias for alert_type
-        type: alert.alert_type
-      })) as Alert[];
+      return data.map(alert => transformDatabaseAlert(alert as DatabaseAlert));
     },
     enabled: !!type
   });
@@ -160,67 +162,48 @@ export const useCreateAlert = () => {
 
   return useMutation({
     mutationFn: async (newAlert: Partial<Alert>) => {
-      // Ensure required fields are present
-      const alertWithDefaults = {
-        ...newAlert,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        start_time: newAlert.start_time || new Date().toISOString(),
+      // Extract only the fields that are in the database schema
+      const dbAlert = {
+        title: newAlert.title || 'Alert',
         description: newAlert.description || "",
+        severity: newAlert.severity || "medium",
+        alert_type: newAlert.alert_type || "other",
+        start_time: newAlert.start_time || new Date().toISOString(),
+        end_time: newAlert.end_time || null,
+        created_by: newAlert.created_by || null,
         latitude: newAlert.latitude || 0,
         longitude: newAlert.longitude || 0,
-        alert_type: newAlert.alert_type || "other",
-        severity: newAlert.severity || "medium"
+        radius: newAlert.radius || 1000, // Default radius in meters
+        source: newAlert.source || null
       };
 
       const { data, error } = await supabase
         .from('alerts')
-        .insert([alertWithDefaults])
+        .insert([dbAlert])
         .select()
         .single();
 
       if (error) throw error;
       
-      // Add the alert to the user-alerts junction table if user_id is available
+      // Add the alert to the user's alert history if created_by is available
       if (data.created_by) {
-        try {
-          await supabase
-            .from('user_alert_subscriptions')
-            .insert([{ 
-              user_id: data.created_by, 
-              alert_id: data.id 
-            }]);
-        } catch (subscriptionError) {
-          console.error("Error creating subscription:", subscriptionError);
-        }
-
-        // Add the alert to the alert history
         try {
           await supabase
             .from('user_alert_history')
             .insert([{ 
               user_id: data.created_by, 
               alert_id: data.id, 
-              action: 'created' 
+              action: 'created',
+              dismissed: false,
+              saved: false
             }]);
         } catch (historyError) {
           console.error("Error creating history:", historyError);
         }
       }
 
-      // Transform the result
-      const transformedAlert = {
-        ...data,
-        location: data.location || `${data.latitude}, ${data.longitude}`,
-        status: data.status || 'active',
-        is_resolved: data.is_resolved || false,
-        category: data.category || data.alert_type,
-        user_id: data.user_id || data.created_by,
-        updates: data.updates || [],
-        type: data.alert_type
-      } as Alert;
-
-      return transformedAlert;
+      // Transform the result to our Alert interface
+      return transformDatabaseAlert(data as DatabaseAlert);
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['alerts'] });
@@ -239,28 +222,34 @@ export const useUpdateAlert = () => {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Alert> & { id: string }) => {
+      // Extract only fields that are in the database schema
+      const dbUpdates: Partial<DatabaseAlert> = {};
+      
+      if (updates.title) dbUpdates.title = updates.title;
+      if (updates.description) dbUpdates.description = updates.description;
+      if (updates.severity) dbUpdates.severity = updates.severity;
+      if (updates.alert_type) dbUpdates.alert_type = updates.alert_type;
+      if (updates.start_time) dbUpdates.start_time = updates.start_time;
+      if (updates.end_time) dbUpdates.end_time = updates.end_time;
+      if (updates.latitude) dbUpdates.latitude = updates.latitude;
+      if (updates.longitude) dbUpdates.longitude = updates.longitude;
+      if (updates.radius) dbUpdates.radius = updates.radius;
+      if ('source' in updates) dbUpdates.source = updates.source;
+      
+      // Always update the updated_at timestamp
+      dbUpdates.updated_at = new Date().toISOString();
+      
       const { data, error } = await supabase
         .from('alerts')
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update(dbUpdates)
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
       
-      // Transform the result
-      const transformedAlert = {
-        ...data,
-        location: data.location || `${data.latitude}, ${data.longitude}`,
-        status: data.status || 'active',
-        is_resolved: data.is_resolved || false,
-        category: data.category || data.alert_type,
-        user_id: data.user_id || data.created_by,
-        updates: data.updates || [],
-        type: data.alert_type
-      } as Alert;
-
-      return transformedAlert;
+      // Transform the result to our Alert interface
+      return transformDatabaseAlert(data as DatabaseAlert);
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['alerts'] });
@@ -301,15 +290,22 @@ export const useDeleteAlert = () => {
   });
 };
 
-// Hook to subscribe to an alert
+// Hook to track alert interaction in user history
 export const useSubscribeToAlert = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ userId, alertId }: { userId: string, alertId: string }) => {
+      // Use user_alert_history instead of a subscription table
       const { error } = await supabase
-        .from('user_alert_subscriptions')
-        .insert([{ user_id: userId, alert_id: alertId }]);
+        .from('user_alert_history')
+        .insert([{ 
+          user_id: userId, 
+          alert_id: alertId,
+          action: 'subscribed',
+          viewed_at: new Date().toISOString(),
+          saved: true
+        }]);
 
       if (error) throw error;
       
@@ -317,34 +313,25 @@ export const useSubscribeToAlert = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alert-subscriptions'] });
-      toast.success('Subscribed to alert successfully');
+      toast.success('Alert saved successfully');
     },
     onError: (error: any) => {
-      toast.error(`Failed to subscribe to alert: ${error.message}`);
-      console.error('Error subscribing to alert:', error);
+      toast.error(`Failed to save alert: ${error.message}`);
+      console.error('Error saving alert:', error);
     }
   });
 };
 
-// Hook to subscribe to real-time alerts (simulated for now)
+// Hook to subscribe to real-time alerts
 export const useSubscribeToAlerts = (callback: (alerts: Alert[] | Alert) => void) => {
   useEffect(() => {
     const channel = supabase
       .channel('alerts-channel')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alerts' }, (payload) => {
-        const newAlert = payload.new as Alert;
+        const newAlert = payload.new as DatabaseAlert;
         
-        // Add derived fields
-        const enrichedAlert = {
-          ...newAlert,
-          location: newAlert.location || `${newAlert.latitude}, ${newAlert.longitude}`,
-          status: newAlert.status || 'active',
-          is_resolved: newAlert.is_resolved || false,
-          category: newAlert.category || newAlert.alert_type,
-          user_id: newAlert.user_id || newAlert.created_by,
-          updates: newAlert.updates || [],
-          type: newAlert.alert_type
-        };
+        // Transform the alert
+        const enrichedAlert = transformDatabaseAlert(newAlert);
         
         callback(enrichedAlert);
       })
