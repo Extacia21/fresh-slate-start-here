@@ -32,6 +32,7 @@ import NotFound from "./pages/NotFound";
 import EnhancedProfile from "./pages/EnhancedProfile";
 import Nearby from "./pages/Nearby";
 import ReportIncident from "./pages/ReportIncident";
+import Map from "./pages/Map";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -75,6 +76,7 @@ function App() {
                   <Route path="chat" element={<Chat />} />
                   <Route path="nearby" element={<Nearby />} />
                   <Route path="report" element={<ReportIncident />} />
+                  <Route path="map" element={<Map />} />
                 </Route>
                 
                 {/* 404 route */}

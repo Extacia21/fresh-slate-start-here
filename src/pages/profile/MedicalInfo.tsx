@@ -1,192 +1,237 @@
 
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Droplet, AlertCircle, Activity } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { ChevronLeft, Loader2, Plus, X } from "lucide-react";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { toast } from "@/components/ui/use-toast";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useProfileData } from "@/hooks/use-profile-data";
+import { useUpdateProfile } from "@/services/profileService";
+import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+
+const formSchema = z.object({
+  bloodType: z.string().optional(),
+  newAllergy: z.string().optional(),
+  medicalConditions: z.string().optional(),
+  medications: z.string().optional(),
+  emergencyNotes: z.string().optional(),
+});
 
 const MedicalInfo = () => {
-  const navigate = useNavigate();
-  const [isEditing, setIsEditing] = useState(false);
-  const [medicalInfo, setMedicalInfo] = useState({
-    bloodType: "O+",
-    allergies: "Penicillin, Peanuts",
-    medications: "",
-    conditions: ""
+  const { profileData, isLoading } = useProfileData();
+  const { user } = useAuth();
+  const [allergies, setAllergies] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const updateProfile = useUpdateProfile();
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      bloodType: "",
+      newAllergy: "",
+      medicalConditions: "",
+      medications: "",
+      emergencyNotes: "",
+    },
   });
 
   useEffect(() => {
-    // Load medical info from localStorage
-    const savedProfile = localStorage.getItem("userProfile");
-    if (savedProfile) {
-      try {
-        const profile = JSON.parse(savedProfile);
-        setMedicalInfo({
-          ...medicalInfo,
-          bloodType: profile.bloodType || medicalInfo.bloodType,
-          allergies: Array.isArray(profile.allergies) 
-            ? profile.allergies.join(", ") 
-            : (profile.allergies || medicalInfo.allergies),
-          medications: profile.medications || medicalInfo.medications,
-          conditions: profile.conditions || medicalInfo.conditions
-        });
-      } catch (e) {
-        console.error("Failed to load medical info:", e);
-      }
+    if (profileData) {
+      // Parse allergies from comma-separated string to array
+      const allergiesArray = profileData.allergies
+        ? profileData.allergies.split(",").filter(Boolean)
+        : [];
+      setAllergies(allergiesArray);
+      
+      form.reset({
+        bloodType: profileData.blood_type || "",
+        medicalConditions: profileData.medical_conditions || "",
+        medications: profileData.medications || "",
+        emergencyNotes: profileData.emergency_notes || "",
+        newAllergy: "",
+      });
     }
-  }, []);
+  }, [profileData, form]);
 
-  const handleSave = () => {
-    // Format allergies back to array if needed
-    const allergiesArray = medicalInfo.allergies
-      .split(",")
-      .map(item => item.trim())
-      .filter(item => item !== "");
-    
-    // Update localStorage with new medical info
-    try {
-      const savedProfile = localStorage.getItem("userProfile") || "{}";
-      const profile = JSON.parse(savedProfile);
-      const updatedProfile = {
-        ...profile,
-        bloodType: medicalInfo.bloodType,
-        allergies: allergiesArray.length > 0 ? allergiesArray : medicalInfo.allergies,
-        medications: medicalInfo.medications,
-        conditions: medicalInfo.conditions
-      };
-      localStorage.setItem("userProfile", JSON.stringify(updatedProfile));
-      
-      toast({
-        title: "Medical information updated",
-        description: "Your medical information has been updated successfully"
-      });
-      
-      setIsEditing(false);
-    } catch (e) {
-      console.error("Failed to update medical info:", e);
-      toast({
-        title: "Update failed",
-        description: "There was an error updating your medical information",
-        variant: "destructive"
-      });
+  const addAllergy = () => {
+    const newAllergy = form.getValues("newAllergy");
+    if (newAllergy && !allergies.includes(newAllergy)) {
+      setAllergies([...allergies, newAllergy]);
+      form.setValue("newAllergy", "");
     }
   };
 
+  const removeAllergy = (allergyToRemove: string) => {
+    setAllergies(allergies.filter(allergy => allergy !== allergyToRemove));
+  };
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (!user) return;
+    
+    setIsSaving(true);
+    
+    try {
+      const allergiesString = allergies.join(",");
+      
+      await updateProfile.mutateAsync({
+        blood_type: values.bloodType,
+        allergies: allergiesString,
+        medical_conditions: values.medicalConditions,
+        medications: values.medications,
+        emergency_notes: values.emergencyNotes,
+      });
+      
+      toast.success("Medical information saved");
+    } catch (error) {
+      toast.error("Failed to save medical information");
+      console.error("Error saving medical info:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+          <p className="mt-2">Loading medical information...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="page-container">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Medical Information</h1>
-        <Button 
-          variant={isEditing ? "outline" : "default"} 
-          onClick={() => setIsEditing(!isEditing)}
-        >
-          {isEditing ? "Cancel" : "Edit"}
-        </Button>
+    <div className="page-container pb-20">
+      <div className="flex items-center mb-6">
+        <Link to="/app/profile" className="mr-2">
+          <ChevronLeft className="h-5 w-5" />
+        </Link>
+        <h1 className="text-xl font-bold">Medical Information</h1>
       </div>
 
-      <div className="bg-card rounded-lg p-4 shadow-subtle space-y-4">
-        <div className="space-y-2">
-          <div className="flex items-center">
-            <Droplet className="h-5 w-5 text-primary mr-2" />
-            <label className="text-sm font-medium">Blood Type</label>
-          </div>
-          {isEditing ? (
-            <Select 
-              value={medicalInfo.bloodType}
-              onValueChange={(value) => setMedicalInfo({...medicalInfo, bloodType: value})}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select blood type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="A+">A+</SelectItem>
-                <SelectItem value="A-">A-</SelectItem>
-                <SelectItem value="B+">B+</SelectItem>
-                <SelectItem value="B-">B-</SelectItem>
-                <SelectItem value="AB+">AB+</SelectItem>
-                <SelectItem value="AB-">AB-</SelectItem>
-                <SelectItem value="O+">O+</SelectItem>
-                <SelectItem value="O-">O-</SelectItem>
-              </SelectContent>
-            </Select>
-          ) : (
-            <p className="text-foreground pl-7">{medicalInfo.bloodType}</p>
-          )}
-        </div>
-        
-        <div className="space-y-2">
-          <div className="flex items-center">
-            <AlertCircle className="h-5 w-5 text-primary mr-2" />
-            <label className="text-sm font-medium">Allergies</label>
-          </div>
-          {isEditing ? (
-            <Textarea 
-              placeholder="List allergies separated by commas"
-              value={medicalInfo.allergies}
-              onChange={(e) => setMedicalInfo({...medicalInfo, allergies: e.target.value})}
-            />
-          ) : (
-            <p className="text-foreground pl-7">{medicalInfo.allergies}</p>
-          )}
-        </div>
-        
-        <div className="space-y-2">
-          <div className="flex items-center">
-            <Activity className="h-5 w-5 text-primary mr-2" />
-            <label className="text-sm font-medium">Current Medications</label>
-          </div>
-          {isEditing ? (
-            <Textarea 
-              placeholder="List current medications"
-              value={medicalInfo.medications}
-              onChange={(e) => setMedicalInfo({...medicalInfo, medications: e.target.value})}
-            />
-          ) : (
-            <p className="text-foreground pl-7">
-              {medicalInfo.medications ? medicalInfo.medications : "None"}
-            </p>
-          )}
-        </div>
-        
-        <div className="space-y-2">
-          <div className="flex items-center">
-            <Activity className="h-5 w-5 text-primary mr-2" />
-            <label className="text-sm font-medium">Medical Conditions</label>
-          </div>
-          {isEditing ? (
-            <Textarea 
-              placeholder="List any medical conditions"
-              value={medicalInfo.conditions}
-              onChange={(e) => setMedicalInfo({...medicalInfo, conditions: e.target.value})}
-            />
-          ) : (
-            <p className="text-foreground pl-7">
-              {medicalInfo.conditions ? medicalInfo.conditions : "None"}
-            </p>
-          )}
-        </div>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <FormField
+            control={form.control}
+            name="bloodType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Blood Type</FormLabel>
+                <FormControl>
+                  <Input placeholder="A+, B-, O+, etc." {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        {isEditing && (
-          <div className="pt-4">
-            <Button className="w-full" onClick={handleSave}>
-              Save Changes
-            </Button>
+          <div>
+            <FormLabel htmlFor="allergies">Allergies</FormLabel>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {allergies.map((allergy, index) => (
+                <Badge key={index} variant="outline" className="pl-3">
+                  {allergy}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 w-5 p-0 ml-1"
+                    onClick={() => removeAllergy(allergy)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </Badge>
+              ))}
+              {allergies.length === 0 && (
+                <p className="text-sm text-muted-foreground">No allergies added</p>
+              )}
+            </div>
+            
+            <div className="flex mt-2">
+              <FormField
+                control={form.control}
+                name="newAllergy"
+                render={({ field }) => (
+                  <FormItem className="flex-1">
+                    <FormControl>
+                      <Input placeholder="Add allergy..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="ml-2"
+                onClick={addAllergy}
+              >
+                <Plus className="h-4 w-4 mr-1" /> Add
+              </Button>
+            </div>
           </div>
-        )}
-      </div>
 
-      <div className="mt-8">
-        <Button 
-          variant="outline" 
-          className="w-full"
-          onClick={() => navigate("/app/profile")}
-        >
-          Back to Profile
-        </Button>
-      </div>
+          <FormField
+            control={form.control}
+            name="medicalConditions"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Medical Conditions</FormLabel>
+                <FormControl>
+                  <Input placeholder="Any existing medical conditions..." {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="medications"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Current Medications</FormLabel>
+                <FormControl>
+                  <Input placeholder="List of medications you're taking..." {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="emergencyNotes"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Emergency Notes</FormLabel>
+                <FormControl>
+                  <Input placeholder="Any additional information for emergency responders..." {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <Button type="submit" disabled={isSaving}>
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Save Medical Information"
+            )}
+          </Button>
+        </form>
+      </Form>
     </div>
   );
 };

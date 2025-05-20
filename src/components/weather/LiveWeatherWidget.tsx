@@ -9,6 +9,9 @@ interface WeatherData {
   windSpeed: number;
   description: string;
   icon: React.ElementType;
+  highTemp: number;
+  lowTemp: number;
+  location: string;
 }
 
 const LiveWeatherWidget = () => {
@@ -29,8 +32,7 @@ const LiveWeatherWidget = () => {
   };
 
   const fetchWeather = async () => {
-    // In a real app, this would be an API call to a weather service API
-    // For this demo, we'll simulate weather data that would be fetched from a weather API
+    // In a real app, this would be an API call to a weather service API for Chinhoyi, Zimbabwe
     try {
       // Simulate API fetch with different weather conditions
       const conditions = [
@@ -43,9 +45,11 @@ const LiveWeatherWidget = () => {
       ];
       
       const randomCondition = conditions[Math.floor(Math.random() * conditions.length)];
-      const randomTemp = Math.floor(Math.random() * 25) + 60; // 60-85°F
-      const randomHumidity = Math.floor(Math.random() * 50) + 30; // 30-80%
-      const randomWind = Math.floor(Math.random() * 15) + 1; // 1-15 mph
+      const randomTemp = Math.floor(Math.random() * 10) + 25; // 25-35°C for Chinhoyi
+      const highTemp = randomTemp + Math.floor(Math.random() * 5); // High temp is 1-5 degrees higher
+      const lowTemp = randomTemp - Math.floor(Math.random() * 5); // Low temp is 1-5 degrees lower
+      const randomHumidity = Math.floor(Math.random() * 30) + 50; // 50-80% humidity for tropical climate
+      const randomWind = Math.floor(Math.random() * 10) + 5; // 5-15 km/h wind speed
       
       let description = "";
       if (randomCondition === "Partly Cloudy") {
@@ -64,11 +68,14 @@ const LiveWeatherWidget = () => {
       
       setWeather({
         temp: randomTemp,
+        highTemp: highTemp,
+        lowTemp: lowTemp,
         condition: randomCondition,
         humidity: randomHumidity,
         windSpeed: randomWind,
         description: description,
-        icon: getWeatherIcon(randomCondition)
+        icon: getWeatherIcon(randomCondition),
+        location: "Chinhoyi, Zimbabwe"
       });
       
       setIsLoading(false);
@@ -83,7 +90,6 @@ const LiveWeatherWidget = () => {
     fetchWeather();
     
     // Set up interval for less frequent updates (every 30 minutes instead of every minute)
-    // In a real app, this would be aligned with the weather API's update frequency
     const interval = setInterval(() => {
       fetchWeather();
     }, 1800000); // 30 minutes
@@ -113,16 +119,22 @@ const LiveWeatherWidget = () => {
           <div className="flex items-center">
             <weather.icon className="h-10 w-10 mr-3" />
             <div>
-              <h2 className="font-bold text-2xl">{weather.temp}°F</h2>
+              <h2 className="font-bold text-2xl">{weather.temp}°C</h2>
+              <div className="flex items-center text-xs">
+                <span>H: {weather.highTemp}°C</span>
+                <span className="mx-1">|</span>
+                <span>L: {weather.lowTemp}°C</span>
+              </div>
               <p className="text-sm opacity-90">{weather.condition}</p>
             </div>
           </div>
           <p className="text-sm mt-2 opacity-90">{weather.description}</p>
+          <p className="text-xs mt-1 font-medium">{weather.location}</p>
         </div>
         <div className="space-y-2">
           <div className="flex items-center text-xs">
             <Wind className="h-3 w-3 mr-1" />
-            <span>Wind: {weather.windSpeed} mph</span>
+            <span>Wind: {weather.windSpeed} km/h</span>
           </div>
           <div className="flex items-center text-xs">
             <Droplets className="h-3 w-3 mr-1" />

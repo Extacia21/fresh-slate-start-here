@@ -1,56 +1,66 @@
+
 import { useState, useEffect } from "react";
-import { ArrowLeft, Building, Heart, MapPin, Navigation, Phone, Search, Shield } from "lucide-react";
+import { ArrowLeft, Building, Heart, MapPin, Navigation, Phone, Search, Shield, Hospital, FireExtinguisher } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import LocationMap from "@/components/common/LocationMap";
 import { toast } from "sonner";
 
-// Mock nearby locations
+// Mock nearby locations in Chinhoyi, Zimbabwe
 const mockLocations = [
   {
     id: 1,
-    name: "City Hospital",
+    name: "Chinhoyi Provincial Hospital",
     category: "hospital",
-    distance: "0.8 miles",
-    address: "123 Main Street, Downtown",
-    phone: "(555) 123-4567",
-    icon: Heart
+    distance: "1.2 km",
+    address: "Magamba Way, Chinhoyi, Zimbabwe",
+    phone: "+263 67 2122275",
+    icon: Hospital
   },
   {
     id: 2,
-    name: "Police Station",
+    name: "Chinhoyi Central Police Station",
     category: "police",
-    distance: "1.2 miles",
-    address: "456 Oak Avenue, Westside",
-    phone: "(555) 234-5678",
+    distance: "0.8 km",
+    address: "Main Street, Chinhoyi, Zimbabwe",
+    phone: "+263 67 2122555",
     icon: Shield
   },
   {
     id: 3,
-    name: "Community Center",
+    name: "Chinhoyi Community Center",
     category: "shelter",
-    distance: "0.5 miles",
-    address: "789 Pine Street, Eastside",
-    phone: "(555) 345-6789",
+    distance: "1.5 km",
+    address: "Community Drive, Chinhoyi, Zimbabwe",
+    phone: "+263 67 2123456",
     icon: Building
   },
   {
     id: 4,
-    name: "St. Mary's Hospital",
+    name: "Chinhoyi Clinic",
     category: "hospital",
-    distance: "1.5 miles",
-    address: "135 Care Way, Riverside",
-    phone: "(555) 456-7890",
+    distance: "2.1 km",
+    address: "Health Street, Chinhoyi, Zimbabwe",
+    phone: "+263 67 2125678",
     icon: Heart
   },
   {
     id: 5,
-    name: "City Fire Station",
+    name: "Chinhoyi Fire Station",
     category: "fire",
-    distance: "0.7 miles",
-    address: "246 Elm Street, Downtown",
-    phone: "(555) 567-8901",
+    distance: "1.1 km",
+    address: "Fire Brigade Road, Chinhoyi, Zimbabwe",
+    phone: "+263 67 2122911",
+    icon: FireExtinguisher
+  },
+  {
+    id: 6,
+    name: "Chinhoyi Emergency Shelter",
+    category: "shelter",
+    distance: "1.8 km",
+    address: "School Road, Chinhoyi, Zimbabwe",
+    phone: "+263 67 2124567",
     icon: Building
   }
 ];
@@ -113,7 +123,7 @@ const Nearby = () => {
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center">
             <MapPin className="h-5 w-5 mr-2" />
-            <h1 className="text-xl font-bold">Nearby Locations</h1>
+            <h1 className="text-xl font-bold">Nearby Locations in Chinhoyi</h1>
           </div>
         </div>
         
@@ -230,7 +240,7 @@ const Nearby = () => {
 
         <div className="hidden md:block h-full min-h-[400px] rounded-lg overflow-hidden border border-border">
           <LocationMap
-            location={selectedLocation ? selectedLocation.address : "Current Location"}
+            location={selectedLocation ? selectedLocation.address : "Chinhoyi, Zimbabwe"}
             zoom={15}
             showDirections={true}
             className="w-full h-full"

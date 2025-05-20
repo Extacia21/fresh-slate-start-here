@@ -11,7 +11,66 @@ export interface Contact {
   is_favorite: boolean;
   created_at: string;
   user_id?: string;
+  email?: string;
 }
+
+// Default emergency contacts for Chinhoyi, Zimbabwe
+const defaultContacts = [
+  {
+    id: 'chinhoyi-police',
+    name: 'Chinhoyi Police',
+    phone: '+263 67 2122555',
+    type: 'emergency',
+    is_favorite: true,
+    created_at: new Date().toISOString(),
+    user_id: null
+  },
+  {
+    id: 'chinhoyi-ambulance',
+    name: 'Chinhoyi Ambulance',
+    phone: '+263 67 2122911',
+    type: 'emergency',
+    is_favorite: true,
+    created_at: new Date().toISOString(),
+    user_id: null
+  },
+  {
+    id: 'chinhoyi-fire',
+    name: 'Chinhoyi Fire Department',
+    phone: '+263 67 2122999',
+    type: 'emergency',
+    is_favorite: true,
+    created_at: new Date().toISOString(),
+    user_id: null
+  },
+  {
+    id: 'chinhoyi-hospital',
+    name: 'Chinhoyi Provincial Hospital',
+    phone: '+263 67 2122275',
+    type: 'emergency',
+    is_favorite: true,
+    created_at: new Date().toISOString(),
+    user_id: null
+  },
+  {
+    id: 'chinhoyi-towing',
+    name: 'Chinhoyi Towing Service',
+    phone: '+263 67 2123456',
+    type: 'service',
+    is_favorite: false,
+    created_at: new Date().toISOString(),
+    user_id: null
+  },
+  {
+    id: 'chinhoyi-emergency',
+    name: 'Chinhoyi Emergency Hotline',
+    phone: '+263 67 2122000',
+    type: 'emergency',
+    is_favorite: true,
+    created_at: new Date().toISOString(),
+    user_id: null
+  },
+];
 
 export const useGetContacts = () => {
   const { user } = useAuth();
@@ -37,19 +96,9 @@ export const useGetContacts = () => {
         personalContacts = userContacts as Contact[];
       }
       
-      // Then, get default emergency contacts (null user_id)
-      const { data: defaultContacts, error: defaultError } = await supabase
-        .from('contacts')
-        .select('*')
-        .is('user_id', null)
-        .order('is_favorite', { ascending: false });
-      
-      if (defaultError) {
-        throw new Error(defaultError.message);
-      }
-      
-      // Combine both sets of contacts
-      const allContacts = [...personalContacts, ...(defaultContacts as Contact[])];
+      // Instead of trying to fetch default contacts from the database,
+      // we'll use our hardcoded Chinhoyi emergency contacts
+      const allContacts = [...personalContacts, ...defaultContacts];
       
       return allContacts;
     },
@@ -96,7 +145,11 @@ export const useUpdateContact = () => {
   
   return useMutation({
     mutationFn: async (contact: Partial<Contact> & { id: string }) => {
-      // Check if this is a default contact (null user_id)
+      // Check if this is a default contact (starts with chinhoyi-)
+      if (contact.id.startsWith('chinhoyi-')) {
+        throw new Error("Cannot update default emergency contacts");
+      }
+      
       const { data: existingContact, error: checkError } = await supabase
         .from('contacts')
         .select('user_id')
@@ -141,6 +194,11 @@ export const useDeleteContact = () => {
   
   return useMutation({
     mutationFn: async (id: string) => {
+      // Check if this is a default contact (starts with chinhoyi-)
+      if (id.startsWith('chinhoyi-')) {
+        throw new Error("Cannot delete default emergency contacts");
+      }
+      
       // Check if this is a default contact (null user_id)
       const { data: existingContact, error: checkError } = await supabase
         .from('contacts')

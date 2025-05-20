@@ -1,12 +1,12 @@
 
-import { Home, Bell, BookOpen, Phone, User } from "lucide-react";
+import { Home, Bell, BookOpen, Map, User } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const items = [
   { icon: Home, label: "Home", to: "/app" },
   { icon: Bell, label: "Alerts", to: "/app/alerts" },
   { icon: BookOpen, label: "Resources", to: "/app/resources" },
-  { icon: Phone, label: "Contacts", to: "/app/contacts" },
+  { icon: Map, label: "Map", to: "/app/map" },
   { icon: User, label: "Profile", to: "/app/profile" },
 ];
 

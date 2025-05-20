@@ -1,299 +1,345 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+
+import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2, MapPin, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, User, Map, Droplet, Phone } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
-import { supabase } from '@/integrations/supabase/client';
+import { useUpdateProfile } from "@/services/profileService";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const formSchema = z.object({
+  firstName: z.string().min(2, "First name must be at least 2 characters"),
+  lastName: z.string().min(2, "Last name must be at least 2 characters"),
+  phone: z.string().min(9, "Phone number is required"),
+  address: z.string().min(5, "Address is required"),
+  city: z.string().min(2, "City is required"),
+  state: z.string().optional(),
+  birthYear: z.string().min(4, "Year is required"),
+  birthMonth: z.string().min(1, "Month is required"),
+  birthDay: z.string().min(1, "Day is required"),
+});
 
 const FillProfile = () => {
-  const [formData, setFormData] = useState({
-    phone: "",
-    address: "",
-    bloodType: "",
-    emergencyContact: "",
-    emergencyRelation: "",
-    emergencyPhone: "",
-  });
-  const [step, setStep] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const [email, setEmail] = useState<string | null>(null);
-  const [name, setName] = useState<string | null>(null);
+  const location = useLocation();
+  const { user } = useAuth();
+  const updateProfileMutation = useUpdateProfile();
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Get email from session storage (passed from signup)
-  useEffect(() => {
-    const storedEmail = sessionStorage.getItem("newUserEmail");
-    const storedName = sessionStorage.getItem("newUserName");
-    if (!storedEmail) {
-      // If no email is found, redirect to signup
-      navigate("/signup");
-    } else {
-      setEmail(storedEmail);
-      setName(storedName);
-    }
-  }, [navigate]);
+  // Get name and email from location state if available
+  const locationState = location.state as { name?: string; email?: string } | null;
+  const nameFromState = locationState?.name || "";
+  const nameParts = nameFromState.split(" ");
+  const firstNameFromState = nameParts[0] || "";
+  const lastNameFromState = nameParts.slice(1).join(" ") || "";
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { id, value } = e.target;
-    setFormData((prev) => ({ ...prev, [id]: value }));
-  };
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      firstName: firstNameFromState,
+      lastName: lastNameFromState,
+      phone: "",
+      address: "",
+      city: "Chinhoyi",
+      state: "Zimbabwe",
+      birthYear: "",
+      birthMonth: "",
+      birthDay: "",
+    },
+  });
 
-  const handleSelectChange = (value: string, field: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleNext = () => {
-    if (step === 1) {
-      if (!formData.phone || !formData.address) {
-        toast({
-          title: "Error",
-          description: "Please fill in all required fields",
-          variant: "destructive",
-        });
-        return;
-      }
-      setStep(2);
-    } else {
-      handleSubmit();
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!formData.emergencyContact || !formData.emergencyPhone) {
-      toast({
-        title: "Error",
-        description: "Please provide emergency contact information",
-        variant: "destructive",
-      });
-      return;
-    }
-    
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
+
+    const dateOfBirth = `${values.birthYear}-${values.birthMonth.padStart(2, '0')}-${values.birthDay.padStart(2, '0')}`;
     
     try {
-      // Get the user ID if they signed up and got an email confirmation automatically
-      const { data: authData } = await supabase.auth.getSession();
-      const userId = authData.session?.user?.id;
-      
-      if (userId) {
-        // User is already authenticated, update their profile
-        const { error } = await supabase
-          .from('profiles')
-          .upsert({
-            id: userId,
-            first_name: name?.split(' ')[0] || '',
-            last_name: name?.split(' ').slice(1).join(' ') || '',
-            phone: formData.phone,
-            address: formData.address,
-            blood_type: formData.bloodType,
-            emergency_contact_name: formData.emergencyContact,
-            emergency_contact_phone: formData.emergencyPhone,
-            emergency_contact_relation: formData.emergencyRelation,
-          });
-          
-        if (error) {
-          throw error;
-        }
-        
-        toast({
-          title: "Profile completed",
-          description: "Your profile has been updated successfully",
-        });
-        
-        navigate("/app"); // Direct to app if already authenticated
-      } else {
-        // Store profile data in localStorage to be used after login
-        const profileData = {
-          first_name: name?.split(' ')[0] || '',
-          last_name: name?.split(' ').slice(1).join(' ') || '',
-          phone: formData.phone,
-          address: formData.address,
-          blood_type: formData.bloodType,
-          emergency_contact_name: formData.emergencyContact,
-          emergency_contact_phone: formData.emergencyPhone,
-          emergency_contact_relation: formData.emergencyRelation,
-        };
-        
-        localStorage.setItem("pendingProfileData", JSON.stringify(profileData));
-        
-        toast({
-          title: "Profile information saved",
-          description: "Please sign in to complete your registration",
-        });
-        
-        // Clean up session storage
-        sessionStorage.removeItem("newUserEmail");
-        sessionStorage.removeItem("newUserName");
-        
-        navigate("/signin");
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to save profile data",
-        variant: "destructive",
+      await updateProfileMutation.mutateAsync({
+        first_name: values.firstName,
+        last_name: values.lastName,
+        phone: values.phone,
+        address: values.address,
+        city: values.city,
+        state: values.state || "Zimbabwe",
+        date_of_birth: dateOfBirth,
+        // Set initial allergies as empty string
+        allergies: "",
       });
+
+      toast.success("Profile updated successfully", {
+        description: "Please check your email and confirm your registration."
+      });
+      
+      navigate("/app");
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast.error("Failed to update profile");
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Generate options for birth date dropdowns
+  const generateYears = () => {
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let year = currentYear; year >= currentYear - 100; year--) {
+      years.push(year.toString());
+    }
+    return years;
+  };
+
+  const generateMonths = () => {
+    const months = [];
+    for (let month = 1; month <= 12; month++) {
+      months.push(month.toString());
+    }
+    return months;
+  };
+
+  const generateDays = () => {
+    const days = [];
+    for (let day = 1; day <= 31; day++) {
+      days.push(day.toString());
+    }
+    return days;
+  };
+
+  const years = generateYears();
+  const months = generateMonths();
+  const days = generateDays();
+
   return (
-    <div className="h-full flex flex-col bg-background">
-      <div className="p-4 border-b border-border flex justify-between items-center">
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => step === 1 ? navigate(-1) : setStep(1)} 
-          className="pl-0"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          {step === 1 ? "Back" : "Previous"}
-        </Button>
-        <div className="flex space-x-1">
-          <div className={`h-1 w-6 rounded-full ${step === 1 ? "bg-primary" : "bg-primary/30"}`}></div>
-          <div className={`h-1 w-6 rounded-full ${step === 2 ? "bg-primary" : "bg-primary/30"}`}></div>
-        </div>
+    <div className="container max-w-md py-8">
+      <div className="text-center mb-6">
+        <h1 className="text-2xl font-bold">Complete Your Profile</h1>
+        <p className="text-muted-foreground mt-1">
+          Add your personal information to get started
+        </p>
       </div>
 
-      <div className="flex-1 flex flex-col justify-center px-6 py-8">
-        <div className="flex flex-col items-center mb-8">
-          <div className="bg-primary/10 p-3 rounded-full mb-4">
-            <User className="text-primary h-8 w-8" />
-          </div>
-          <h1 className="text-2xl font-bold">
-            {step === 1 ? "Complete Your Profile" : "Emergency Information"}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1 text-center">
-            {step === 1 
-              ? "Add your details to help us personalize your experience" 
-              : "This information will be used in case of emergency"
-            }
-          </p>
-        </div>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <div className="space-y-4">
+            <div className="flex justify-center mb-4">
+              <div className="h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center">
+                <UserCircle className="h-16 w-16 text-primary" />
+              </div>
+            </div>
 
-        <div className="space-y-4 max-w-sm mx-auto w-full">
-          {step === 1 ? (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="Enter your phone number"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    className="input-crisis pl-10"
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <div className="relative">
-                  <Map className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                  <Input
-                    id="address"
-                    type="text"
-                    placeholder="Enter your address"
-                    value={formData.address}
-                    onChange={handleChange}
-                    className="input-crisis pl-10"
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="bloodType">Blood Type (Optional)</Label>
-                <div className="relative">
-                  <Droplet className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                  <Select onValueChange={(value) => handleSelectChange(value, "bloodType")}>
-                    <SelectTrigger className="input-crisis pl-10">
-                      <SelectValue placeholder="Select your blood type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="A+">A+</SelectItem>
-                      <SelectItem value="A-">A-</SelectItem>
-                      <SelectItem value="B+">B+</SelectItem>
-                      <SelectItem value="B-">B-</SelectItem>
-                      <SelectItem value="AB+">AB+</SelectItem>
-                      <SelectItem value="AB-">AB-</SelectItem>
-                      <SelectItem value="O+">O+</SelectItem>
-                      <SelectItem value="O-">O-</SelectItem>
-                      <SelectItem value="unknown">Don't know</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="emergencyContact">Emergency Contact Name</Label>
-                <Input
-                  id="emergencyContact"
-                  type="text"
-                  placeholder="Name of emergency contact"
-                  value={formData.emergencyContact}
-                  onChange={handleChange}
-                  className="input-crisis"
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="firstName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>First Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="John" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="lastName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Doe" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="+263 771234567" {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    This will be used for emergency notifications
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="address"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Address</FormLabel>
+                  <FormControl>
+                    <Input placeholder="123 Main St" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="city"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>City</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Chinhoyi" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="state"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Country</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Zimbabwe" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div>
+              <FormLabel>Date of Birth</FormLabel>
+              <div className="grid grid-cols-3 gap-2">
+                <FormField
+                  control={form.control}
+                  name="birthYear"
+                  render={({ field }) => (
+                    <FormItem>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Year" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="max-h-80">
+                          {years.map((year) => (
+                            <SelectItem key={year} value={year}>
+                              {year}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="birthMonth"
+                  render={({ field }) => (
+                    <FormItem>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Month" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {months.map((month) => (
+                            <SelectItem key={month} value={month}>
+                              {month}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="birthDay"
+                  render={({ field }) => (
+                    <FormItem>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Day" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {days.map((day) => (
+                            <SelectItem key={day} value={day}>
+                              {day}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
               </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="emergencyRelation">Relationship</Label>
-                <Select onValueChange={(value) => handleSelectChange(value, "emergencyRelation")}>
-                  <SelectTrigger className="input-crisis">
-                    <SelectValue placeholder="Select relationship" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="spouse">Spouse</SelectItem>
-                    <SelectItem value="parent">Parent</SelectItem>
-                    <SelectItem value="child">Child</SelectItem>
-                    <SelectItem value="sibling">Sibling</SelectItem>
-                    <SelectItem value="friend">Friend</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="emergencyPhone">Emergency Contact Phone</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                  <Input
-                    id="emergencyPhone"
-                    type="tel"
-                    placeholder="Emergency contact phone number"
-                    value={formData.emergencyPhone}
-                    onChange={handleChange}
-                    className="input-crisis pl-10"
-                  />
-                </div>
-              </div>
-            </>
-          )}
-          
-          <Button 
-            onClick={handleNext} 
-            className="w-full py-6 mt-6" 
-            disabled={isLoading}
-          >
-            {isLoading ? "Saving..." : step === 1 ? "Next" : "Complete Profile"}
+              <p className="text-xs text-muted-foreground mt-1">
+                Required for age verification and emergency purposes
+              </p>
+            </div>
+          </div>
+
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving profile...
+              </>
+            ) : (
+              "Complete Profile"
+            )}
           </Button>
-          
-          {step === 2 && (
-            <p className="text-xs text-muted-foreground text-center mt-4">
-              This information will only be shared with emergency responders when you activate the SOS feature.
-            </p>
-          )}
-        </div>
-      </div>
+        </form>
+      </Form>
     </div>
   );
 };

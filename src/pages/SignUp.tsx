@@ -1,173 +1,183 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ShieldAlert, Eye, EyeOff, ArrowLeft } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
+import authService from "@/services/authService";
+import { toast } from "sonner";
+
+const formSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address" }),
+  password: z
+    .string()
+    .min(8, { message: "Password must be at least 8 characters" }),
+  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
+});
 
 const SignUp = () => {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { signUp } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!name || !email || !password) {
-      toast({
-        title: "Error",
-        description: "Please fill in all fields",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    if (password.length < 6) {
-      toast({
-        title: "Error",
-        description: "Password must be at least 6 characters",
-        variant: "destructive",
-      });
-      return;
-    }
-    
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+    },
+  });
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
-    
     try {
-      const { data, error } = await signUp(email, password, name);
-      
-      if (error) {
-        toast({
-          title: "Sign Up Failed",
-          description: error.message || "Failed to create account",
-          variant: "destructive",
-        });
-      } else if (data) {
-        // Store email for the fill profile step
-        sessionStorage.setItem("newUserEmail", email);
-        sessionStorage.setItem("newUserName", name);
-        
-        toast({
-          title: "Account created",
-          description: "Please complete your profile information.",
+      const response = await authService.signUp(values);
+
+      if (response.success) {
+        // Show success toast with instructions to check email
+        toast.success("Account created successfully", {
+          description: "Please check your email and confirm your registration."
         });
         
-        // Redirect to fill profile page
-        navigate("/fill-profile");
+        // Navigate to fill profile page
+        navigate("/fill-profile", { 
+          state: { 
+            email: values.email,
+            name: values.name
+          } 
+        });
+      } else {
+        // If email already exists, navigate to sign in
+        if (response.message?.includes("already registered")) {
+          toast.error("Account already exists", {
+            description: "Please sign in instead"
+          });
+          navigate("/signin");
+        } else {
+          // Otherwise show error
+          toast.error("Registration failed", {
+            description: response.message
+          });
+        }
       }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "An unexpected error occurred",
-        variant: "destructive",
+    } catch (error) {
+      toast.error("An unexpected error occurred", {
+        description: "Please try again later"
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  return (
-    <div className="h-full flex flex-col bg-background overflow-auto">
-      <div className="p-4 border-b border-border">
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => navigate(-1)} 
-          className="pl-0"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
-      </div>
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
 
-      <div className="flex-1 flex flex-col justify-center px-6 py-8">
-        <div className="flex flex-col items-center mb-8">
-          <div className="bg-primary/10 p-3 rounded-full mb-4">
-            <ShieldAlert className="text-primary h-8 w-8" />
-          </div>
-          <h1 className="text-2xl font-bold">Create Account</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Sign up to get started
+  return (
+    <div className="h-full flex items-center justify-center">
+      <div className="w-full max-w-md p-8">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold">Create Account</h1>
+          <p className="text-muted-foreground mt-2">
+            Sign up to start managing crisis situations
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 max-w-sm mx-auto w-full">
-          <div className="space-y-2">
-            <Label htmlFor="name">Full Name</Label>
-            <Input
-              id="name"
-              type="text"
-              placeholder="Enter your full name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="input-crisis"
-              autoComplete="name"
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Full Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="John Doe" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="input-crisis"
-              autoComplete="email"
+
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="you@example.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <div className="relative">
-              <Input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                placeholder="Create a password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input-crisis pr-10"
-                autoComplete="new-password"
-              />
-              <button
-                type="button"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                onClick={() => setShowPassword(!showPassword)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Must be at least 6 characters.
-            </p>
-          </div>
 
-          <Button 
-            type="submit" 
-            className="w-full py-6" 
-            disabled={isLoading}
-          >
-            {isLoading ? "Creating Account..." : "Create Account"}
-          </Button>
-        </form>
-      </div>
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        {...field}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3"
+                        onClick={togglePasswordVisibility}
+                      >
+                        {showPassword ? (
+                          <EyeOff size={16} />
+                        ) : (
+                          <Eye size={16} />
+                        )}
+                      </Button>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-      <div className="p-6 text-center border-t border-border">
-        <p className="text-sm text-muted-foreground">
-          Already have an account?{" "}
-          <Link to="/signin" className="text-primary font-medium hover:underline">
-            Sign In
-          </Link>
-        </p>
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating account...
+                </>
+              ) : (
+                "Sign Up"
+              )}
+            </Button>
+          </form>
+        </Form>
+
+        <div className="text-center mt-6">
+          <p className="text-sm text-muted-foreground">
+            Already have an account?{" "}
+            <Link to="/signin" className="text-primary font-medium">
+              Sign in
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );
