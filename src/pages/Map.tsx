@@ -1,16 +1,20 @@
+
 import React from "react";
 import { useGetAllAlerts } from "@/services/alertsService";
 
-// This function will match the expected signature without arguments
-const useCorrectAlerts = () => useGetAllAlerts();
-
 const Map = () => {
-  // Use the wrapper function that doesn't pass parameters
-  const { data: alerts } = useCorrectAlerts();
+  // Use the alerts service directly without wrapper
+  const { data: alerts } = useGetAllAlerts();
   
   return (
-    <div>
-      {/* Component content */}
+    <div className="p-4">
+      <h1 className="text-xl font-bold mb-4">Alert Map</h1>
+      <p className="text-muted-foreground mb-4">
+        Showing {alerts?.length || 0} alerts in your area
+      </p>
+      <div className="bg-muted h-64 rounded flex items-center justify-center">
+        <p className="text-muted-foreground">Map visualization will appear here</p>
+      </div>
     </div>
   );
 };

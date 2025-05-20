@@ -10,7 +10,7 @@ interface OnboardingCheckProps {
 // Define a profile interface that includes the properties we need
 interface Profile {
   id: string;
-  is_onboarded?: boolean;
+  first_name?: string | null;
 }
 
 const OnboardingCheck = ({ children }: OnboardingCheckProps) => {
