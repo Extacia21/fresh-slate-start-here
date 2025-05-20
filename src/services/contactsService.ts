@@ -1,5 +1,5 @@
-
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 export type ContactType = "emergency" | "personal" | "service";
 
@@ -11,7 +11,7 @@ export interface Contact {
   relationship?: string;
   type: ContactType;
   is_favorite: boolean;
-  user_id?: string;
+  user_id?: string | null;
   created_at?: string;
 }
 
@@ -40,7 +40,7 @@ export const getContacts = async (): Promise<Contact[]> => {
     ...contact,
     // Make sure type is one of the valid ContactType values
     type: (contact.type === "emergency" || contact.type === "personal" || contact.type === "service") 
-      ? contact.type 
+      ? contact.type as ContactType 
       : "personal" as ContactType
   }));
 };
@@ -71,6 +71,59 @@ export const getEmergencyContacts = async (): Promise<Contact[]> => {
     ...contact,
     type: "emergency" as ContactType
   }));
+};
+
+// Send SOS alert to emergency contacts
+export const sendSOSAlert = async (
+  contacts: Contact[], 
+  location: string, 
+  message: string
+): Promise<{ success: boolean; message: string }> => {
+  try {
+    // In a real application, this function would:
+    // 1. Send SMS to each contact's phone number
+    // 2. Send emails to contacts with email addresses
+    // 3. Record the SOS event in the database
+    
+    console.log(`Sending SOS to ${contacts.length} contacts at location ${location}: ${message}`);
+    
+    // Record the SOS event in the database
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+
+    if (userId) {
+      // Log SOS event
+      const { error } = await supabase
+        .from("sos_events")
+        .insert({
+          user_id: userId,
+          location,
+          message,
+          contacts_notified: contacts.length,
+          status: "sent",
+        });
+
+      if (error) {
+        console.error("Failed to record SOS event:", error);
+      }
+    }
+
+    // Send emails to contacts with email addresses
+    const emailContacts = contacts.filter(contact => contact.email);
+    if (emailContacts.length > 0) {
+      // In a real application, we would use a serverless function or API 
+      // to send emails to each contact
+      console.log(`Sending emails to ${emailContacts.length} contacts`);
+    }
+    
+    return { success: true, message: "SOS alert sent successfully" };
+  } catch (error) {
+    console.error("Error sending SOS alert:", error);
+    return { 
+      success: false, 
+      message: error instanceof Error ? error.message : "An unknown error occurred" 
+    };
+  }
 };
 
 // Get a contact by ID
@@ -197,6 +250,22 @@ export const toggleFavorite = async (id: string, isFavorite: boolean): Promise<C
   };
 };
 
+// Hook for getting contacts
+export const useGetContacts = () => {
+  return useQuery({
+    queryKey: ['contacts'],
+    queryFn: getContacts
+  });
+};
+
+// Hook for getting SOS contacts (emergency contacts)
+export const useGetSOSContacts = () => {
+  return useQuery({
+    queryKey: ['sosContacts'],
+    queryFn: getEmergencyContacts
+  });
+};
+
 export default {
   getContacts,
   getEmergencyContacts,
@@ -205,4 +274,5 @@ export default {
   updateContact,
   deleteContact,
   toggleFavorite,
+  sendSOSAlert,
 };

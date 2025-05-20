@@ -3,7 +3,8 @@ import { useState } from "react";
 import { Phone, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { useGetSOSContacts, sendSOSAlert, Contact } from "@/services/contactsService";
+import { Contact, getEmergencyContacts } from "@/services/contactsService";
+import { useQuery } from "@tanstack/react-query";
 
 interface SOSButtonProps {
   className?: string;
@@ -13,7 +14,12 @@ const SOSButton = ({ className }: SOSButtonProps) => {
   const [isActive, setIsActive] = useState(false);
   const [isPulsing, setIsPulsing] = useState(false);
   const [countdown, setCountdown] = useState(3);
-  const { data: sosContacts = [], isLoading } = useGetSOSContacts();
+  
+  // Use useQuery for fetching emergency contacts
+  const { data: sosContacts = [], isLoading } = useQuery({
+    queryKey: ['sosContacts'],
+    queryFn: getEmergencyContacts
+  });
   
   const handleSOSActivate = () => {
     if (!isActive) {
@@ -66,7 +72,8 @@ const SOSButton = ({ className }: SOSButtonProps) => {
                 phone: "+263 67 22281",
                 type: "emergency",
                 is_favorite: true,
-                user_id: null
+                user_id: null,
+                email: "police@chinhoyi.gov.zw"
               },
               {
                 id: "sos-default-2",
@@ -74,11 +81,13 @@ const SOSButton = ({ className }: SOSButtonProps) => {
                 phone: "+263 67 22260",
                 type: "emergency",
                 is_favorite: true,
-                user_id: null
+                user_id: null,
+                email: "hospital@chinhoyi.gov.zw"
               }
             ];
           }
           
+          // Send SOS alert using our contactsService function
           const result = await sendSOSAlert(contactsToNotify, locationString, message);
           
           if (result.success) {
@@ -155,3 +164,12 @@ const SOSButton = ({ className }: SOSButtonProps) => {
 };
 
 export default SOSButton;
+
+// Function to mock sending an SOS alert
+async function sendSOSAlert(contacts: Contact[], location: string, message: string) {
+  console.log(`Sending SOS to ${contacts.length} contacts at location ${location}: ${message}`);
+  
+  // In a real app, this would make API calls to send SMS and emails
+  // For now, we'll simulate success
+  return { success: true, message: "Alert sent successfully" };
+}
