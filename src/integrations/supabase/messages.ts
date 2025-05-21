@@ -10,6 +10,7 @@ export interface Message {
   message_text: string;
   created_at: string;
   chat_type?: "community" | "direct";
+  sender_name?: string; // Added sender_name property
 }
 
 // Store messages in memory for this mock implementation

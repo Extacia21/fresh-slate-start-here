@@ -104,7 +104,7 @@ const Chat = () => {
         is_group_message: isGroupChat,
         message_text: newMessage,
         created_at: new Date().toISOString(),
-        sender_name: userName // Add the sender name
+        sender_name: userName // This property is now valid since we updated the Message interface
       };
       
       setMessages(prevMessages => [...prevMessages, optimisticMessage]);
@@ -117,7 +117,7 @@ const Chat = () => {
         chat_room_id: chatRoomId,
         is_group_message: isGroupChat,
         message_text: newMessage,
-        sender_name: userName // Include sender name
+        sender_name: userName // This property is now valid
       };
 
       await sendMessageMutation.mutateAsync(messageToSend);
