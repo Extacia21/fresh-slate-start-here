@@ -1,3 +1,4 @@
+
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, AlertTriangle, Camera, MapPin, AlertCircle, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -80,6 +81,8 @@ const ReportIncident = () => {
         title,
         description,
         category: incidentType,
+        type: incidentType, // Add type property (matches incidentType)
+        severity: "medium", // Add default severity
         location,
         latitude: latitude || undefined,
         longitude: longitude || undefined,
@@ -138,21 +141,26 @@ const ReportIncident = () => {
     }
   }, [useCurrentLocation]);
   
-  const handleLocationSelect = (pos: { lat: number; lng: number }) => {
-    setLatitude(pos.lat);
-    setLongitude(pos.lng);
+  // Updated handleLocationSelect to match expected LocationMap parameters
+  const handleLocationSelect = (lat: number, lng: number, address?: string) => {
+    setLatitude(lat);
+    setLongitude(lng);
     
-    // Try to get address from coordinates
-    fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${pos.lat},${pos.lng}&key=AIzaSyDp9ZnLPvebOjH8MYt8f0zpqYK4mRSlAts`)
-      .then(response => response.json())
-      .then(data => {
-        if (data.results && data.results[0]) {
-          setLocation(data.results[0].formatted_address);
-        }
-      })
-      .catch(error => {
-        console.error("Error getting address:", error);
-      });
+    if (address) {
+      setLocation(address);
+    } else {
+      // Try to get address from coordinates
+      fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=AIzaSyDp9ZnLPvebOjH8MYt8f0zpqYK4mRSlAts`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.results && data.results[0]) {
+            setLocation(data.results[0].formatted_address);
+          }
+        })
+        .catch(error => {
+          console.error("Error getting address:", error);
+        });
+    }
   };
   
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
