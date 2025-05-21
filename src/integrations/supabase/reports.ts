@@ -20,6 +20,7 @@ export interface Report {
 }
 
 export const getReports = async () => {
+  // Use explicit typing with StorageError to avoid TypeScript errors
   const { data, error } = await supabase
     .from('reports')
     .select('*')
@@ -38,6 +39,17 @@ export const getPublicReports = async () => {
   return { data, error };
 };
 
+// Add the missing getReportById function
+export const getReportById = async (id: string) => {
+  const { data, error } = await supabase
+    .from('reports')
+    .select('*')
+    .eq('id', id)
+    .single();
+  
+  return { data, error };
+};
+
 export const createReport = async (report: Omit<Report, 'id' | 'created_at' | 'updated_at'>) => {
   // Create the report
   const { data, error } = await supabase
@@ -49,16 +61,17 @@ export const createReport = async (report: Omit<Report, 'id' | 'created_at' | 'u
   // Also create an alert from this report
   if (data && !error) {
     const alertData = {
+      alert_type: report.type as "police" | "fire" | "health" | "weather" | "other",
       title: report.title,
       description: report.description,
-      type: report.type,
       location: report.location,
       latitude: report.latitude,
       longitude: report.longitude,
-      is_active: true,
       severity: report.severity,
       report_id: data.id,
       photos: report.photos,
+      radius: 0, // Default radius
+      is_active: true
     };
     
     // Create the alert (don't wait for this to complete)
