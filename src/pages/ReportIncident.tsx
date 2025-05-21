@@ -1,6 +1,5 @@
-
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, AlertTriangle, MapPin, AlertCircle, Camera, X, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, AlertTriangle, Camera, MapPin, AlertCircle, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +8,6 @@ import { toast } from "sonner";
 import LocationMap from "@/components/common/LocationMap";
 import { useState, useEffect, useRef } from "react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateReport } from "@/services/reportsService";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,21 +24,9 @@ const ReportIncident = () => {
   const [description, setDescription] = useState("");
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
-  const [severity, setSeverity] = useState<"critical" | "high" | "medium" | "low">("medium");
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoURLs, setPhotoURLs] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  // Get current location on component mount
-  useEffect(() => {
-    getCurrentLocation();
-  }, []); // Empty dependency array means this runs once on mount
-  
-  const handleLocationSelect = (lat: number, lng: number, address: string) => {
-    setLatitude(lat);
-    setLongitude(lng);
-    setLocation(address);
-  };
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,67 +36,61 @@ const ReportIncident = () => {
       return;
     }
     
-    if (!title || !description) {
+    if (!title || !location || !description) {
       toast.error("Please fill in all required fields");
       return;
-    }
-    
-    if (!location) {
-      setLocation("Unknown location");
     }
     
     setIsSubmitting(true);
     
     try {
-      // Upload photos if any
-      const uploadedPhotoURLs: string[] = [];
+      // Upload images if any
+      let uploadedPhotoPaths: string[] = [];
       
       if (photos.length > 0) {
-        toast.info("Uploading photos...");
+        // Create progress toast
+        toast("Uploading images...", {
+          duration: 10000,
+          id: "upload-progress"
+        });
         
         for (const photo of photos) {
-          const fileExt = photo.name.split('.').pop();
-          const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-          const filePath = `reports/${user.id}/${fileName}`;
-          
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('reports')
-            .upload(filePath, photo);
-          
-          if (uploadError) {
-            console.error("Error uploading photo:", uploadError);
-            continue;
+          const fileName = `${user.id}/${Date.now()}-${photo.name}`;
+          const { data, error } = await supabase.storage
+            .from('report-photos')
+            .upload(fileName, photo);
+            
+          if (error) {
+            console.error("Error uploading image:", error);
+            throw new Error(`Failed to upload image: ${error.message}`);
           }
           
-          // Get public URL
-          const { data: publicURLData } = supabase.storage
-            .from('reports')
-            .getPublicUrl(filePath);
-            
-          if (publicURLData && publicURLData.publicUrl) {
-            uploadedPhotoURLs.push(publicURLData.publicUrl);
+          if (data) {
+            uploadedPhotoPaths.push(data.path);
           }
         }
+        
+        // Dismiss progress toast
+        toast.dismiss("upload-progress");
+        toast.success("Images uploaded successfully");
       }
       
-      const reportData = {
+      // Create report only (removed alert creation)
+      await createReportMutation.mutateAsync({
         title,
         description,
         category: incidentType,
-        type: incidentType,
-        location: location || "Unknown location",
+        location,
         latitude: latitude || undefined,
         longitude: longitude || undefined,
         is_public: true,
-        severity: severity,
-        photos: uploadedPhotoURLs.length > 0 ? uploadedPhotoURLs : undefined,
-      };
-      
-      await createReportMutation.mutateAsync(reportData);
+        photos: uploadedPhotoPaths.length > 0 ? uploadedPhotoPaths : undefined
+      });
       
       toast.success("Report submitted successfully", {
         description: "Thank you for your report. Authorities have been notified."
       });
+      
       navigate("/app");
     } catch (error) {
       toast.error("Failed to submit report", {
@@ -126,11 +106,18 @@ const ReportIncident = () => {
         (position) => {
           setLatitude(position.coords.latitude);
           setLongitude(position.coords.longitude);
-          setLocation("Current Location");
-          setUseCurrentLocation(true);
-          toast.info("Using your current location", {
-            description: "Your location has been automatically detected",
-          });
+          
+          // Try to get address from coordinates
+          fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${position.coords.latitude},${position.coords.longitude}&key=AIzaSyDp9ZnLPvebOjH8MYt8f0zpqYK4mRSlAts`)
+            .then(response => response.json())
+            .then(data => {
+              if (data.results && data.results[0]) {
+                setLocation(data.results[0].formatted_address);
+              }
+            })
+            .catch(error => {
+              console.error("Error getting address:", error);
+            });
         },
         (error) => {
           console.error("Error getting location:", error);
@@ -144,53 +131,61 @@ const ReportIncident = () => {
     }
   };
   
-  // Handle photo upload
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      // Limit to 3 photos
-      if (photos.length + e.target.files.length > 3) {
-        toast.error("You can only upload up to 3 photos");
-        return;
-      }
-      
-      // Convert FileList to array and add to photos state
-      const newPhotos = Array.from(e.target.files);
-      setPhotos([...photos, ...newPhotos]);
-      
-      // Create object URLs for preview
-      const newPhotoURLs = newPhotos.map(photo => URL.createObjectURL(photo));
-      setPhotoURLs([...photoURLs, ...newPhotoURLs]);
-    }
-  };
-  
-  // Remove photo
-  const removePhoto = (index: number) => {
-    // Revoke object URL to prevent memory leaks
-    URL.revokeObjectURL(photoURLs[index]);
-    
-    // Remove photo from arrays
-    const newPhotos = [...photos];
-    const newPhotoURLs = [...photoURLs];
-    newPhotos.splice(index, 1);
-    newPhotoURLs.splice(index, 1);
-    
-    setPhotos(newPhotos);
-    setPhotoURLs(newPhotoURLs);
-  };
-  
-  // Clean up object URLs on unmount
-  useEffect(() => {
-    return () => {
-      photoURLs.forEach(url => URL.revokeObjectURL(url));
-    };
-  }, []);
-  
   // Get current location on component mount if using current location
   useEffect(() => {
     if (useCurrentLocation) {
       getCurrentLocation();
     }
   }, [useCurrentLocation]);
+  
+  const handleLocationSelect = (pos: { lat: number; lng: number }) => {
+    setLatitude(pos.lat);
+    setLongitude(pos.lng);
+    
+    // Try to get address from coordinates
+    fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${pos.lat},${pos.lng}&key=AIzaSyDp9ZnLPvebOjH8MYt8f0zpqYK4mRSlAts`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.results && data.results[0]) {
+          setLocation(data.results[0].formatted_address);
+        }
+      })
+      .catch(error => {
+        console.error("Error getting address:", error);
+      });
+  };
+  
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const selectedFiles = Array.from(e.target.files);
+      
+      // Check if adding these files would exceed the limit
+      if (photos.length + selectedFiles.length > 3) {
+        toast.error("You can only upload up to 3 photos");
+        return;
+      }
+      
+      setPhotos(prev => [...prev, ...selectedFiles]);
+      
+      // Generate URLs for preview
+      const newURLs = selectedFiles.map(file => URL.createObjectURL(file));
+      setPhotoURLs(prev => [...prev, ...newURLs]);
+    }
+  };
+  
+  const handleRemovePhoto = (index: number) => {
+    // Revoke the URL to avoid memory leaks
+    URL.revokeObjectURL(photoURLs[index]);
+    
+    setPhotos(prev => prev.filter((_, i) => i !== index));
+    setPhotoURLs(prev => prev.filter((_, i) => i !== index));
+  };
+  
+  const handleCapturePhoto = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
   
   return (
     <div className="flex flex-col h-full">
@@ -227,44 +222,25 @@ const ReportIncident = () => {
             >
               <Label htmlFor="weather" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary">
                 <RadioGroupItem value="weather" id="weather" className="sr-only" />
-                <AlertCircle className="mb-3 h-6 w-6 text-blue-600" />
+                <AlertCircle className="mb-3 h-6 w-6" />
                 <span className="text-sm">Weather Emergency</span>
               </Label>
               <Label htmlFor="fire" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary">
                 <RadioGroupItem value="fire" id="fire" className="sr-only" />
                 <span className="text-2xl mb-2">🔥</span>
-                <span className="text-sm text-red-600">Fire</span>
+                <span className="text-sm">Fire</span>
               </Label>
               <Label htmlFor="health" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary">
                 <RadioGroupItem value="health" id="health" className="sr-only" />
                 <span className="text-2xl mb-2">🏥</span>
-                <span className="text-sm text-green-600">Medical</span>
+                <span className="text-sm">Medical</span>
               </Label>
-              <Label htmlFor="police" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary">
-                <RadioGroupItem value="police" id="police" className="sr-only" />
-                <span className="text-2xl mb-2">🚓</span>
-                <span className="text-sm text-yellow-600">Police</span>
+              <Label htmlFor="other" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary">
+                <RadioGroupItem value="other" id="other" className="sr-only" />
+                <AlertTriangle className="mb-3 h-6 w-6" />
+                <span className="text-sm">Other</span>
               </Label>
             </RadioGroup>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="severity">Severity</Label>
-            <Select 
-              value={severity} 
-              onValueChange={(value: "critical" | "high" | "medium" | "low") => setSeverity(value)}
-              required
-            >
-              <SelectTrigger id="severity">
-                <SelectValue placeholder="Select severity" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="critical">Critical</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
           
           <div className="space-y-2">
@@ -290,59 +266,11 @@ const ReportIncident = () => {
             />
           </div>
           
-          {/* Photo upload section */}
-          <div className="space-y-3">
-            <Label className="flex justify-between items-center">
-              <span>Photos <span className="text-xs text-muted-foreground">(Up to 3)</span></span>
-              <span className="text-xs text-muted-foreground">{photos.length}/3</span>
-            </Label>
-            
-            <div className="grid grid-cols-3 gap-2">
-              {/* Photo previews */}
-              {photoURLs.map((url, index) => (
-                <div key={index} className="relative aspect-square rounded-md overflow-hidden border">
-                  <img 
-                    src={url} 
-                    alt={`Photo ${index + 1}`} 
-                    className="object-cover w-full h-full"
-                  />
-                  <button 
-                    type="button"
-                    className="absolute top-1 right-1 bg-black/60 rounded-full p-1"
-                    onClick={() => removePhoto(index)}
-                  >
-                    <X className="h-3 w-3 text-white" />
-                  </button>
-                </div>
-              ))}
-              
-              {/* Upload button (only show if less than 3 photos) */}
-              {photos.length < 3 && (
-                <button
-                  type="button"
-                  className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-md aspect-square hover:bg-accent/5 transition-colors"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Camera className="h-6 w-6 text-muted-foreground mb-1" />
-                  <span className="text-xs text-muted-foreground">Add photo</span>
-                  <input 
-                    ref={fileInputRef}
-                    type="file" 
-                    accept="image/*" 
-                    multiple 
-                    className="hidden" 
-                    onChange={handlePhotoUpload}
-                  />
-                </button>
-              )}
-            </div>
-          </div>
-          
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <Label>Location</Label>
               <div className="flex items-center space-x-2">
-                <span className="text-xs">{useCurrentLocation ? 'Using current location' : 'Enter manually'}</span>
+                <span className="text-xs">Use my location</span>
                 <button 
                   type="button"
                   className={`relative h-5 w-10 rounded-full transition-colors
@@ -362,19 +290,16 @@ const ReportIncident = () => {
               </div>
             </div>
             
-            {useCurrentLocation ? (
-              <div className="rounded-md border overflow-hidden">
-                <LocationMap 
-                  location="Current Location" 
-                  interactive={true}
-                  onLocationSelect={handleLocationSelect}
-                />
-                <div className="p-2 bg-muted/30 text-center text-sm text-muted-foreground">
-                  <MapPin className="h-3 w-3 inline mr-1" />
-                  Using your current location
-                </div>
-              </div>
-            ) : (
+            <div className="rounded-md border overflow-hidden">
+              <LocationMap 
+                location={location || "Current Location"} 
+                latitude={latitude || undefined}
+                longitude={longitude || undefined}
+                onLocationSelect={!useCurrentLocation ? handleLocationSelect : undefined}
+              />
+            </div>
+            
+            {!useCurrentLocation && (
               <div className="space-y-2">
                 <Input 
                   placeholder="Enter address or description of location" 
@@ -384,6 +309,46 @@ const ReportIncident = () => {
                 />
               </div>
             )}
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Add Photos (max 3)</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {photoURLs.map((url, index) => (
+                <div key={index} className="relative aspect-square border rounded-md overflow-hidden">
+                  <img 
+                    src={url} 
+                    alt={`Upload ${index + 1}`} 
+                    className="w-full h-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRemovePhoto(index)}
+                    className="absolute top-1 right-1 p-1 bg-black/50 rounded-full text-white"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+              
+              {photos.length < 3 && (
+                <div 
+                  className="aspect-square border-2 border-dashed rounded-md flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={handleCapturePhoto}
+                >
+                  <Camera className="h-6 w-6 text-muted-foreground mb-1" />
+                  <span className="text-xs text-muted-foreground">Add Photo</span>
+                  <input 
+                    ref={fileInputRef}
+                    type="file" 
+                    className="hidden" 
+                    accept="image/*" 
+                    onChange={handlePhotoChange}
+                    multiple={photos.length < 2}
+                  />
+                </div>
+              )}
+            </div>
           </div>
           
           <div className="pt-6">
