@@ -4,6 +4,13 @@ import { MapPin, Navigation, Compass } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
+// Ensure Google Maps types are defined
+declare global {
+  interface Window {
+    google: any;
+  }
+}
+
 interface LocationMapProps {
   location?: string;
   className?: string;
@@ -116,11 +123,5 @@ const LocationMap = ({
     </div>
   );
 };
-
-declare global {
-  interface Window {
-    google: any;
-  }
-}
 
 export default LocationMap;

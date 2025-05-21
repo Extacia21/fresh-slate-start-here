@@ -7,12 +7,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
+// Define Google Maps types
+declare global {
+  interface Window {
+    google: any;
+    initMap: () => void;
+  }
+}
+
 // Define emergency location interface
 interface EmergencyLocation {
   id: number;
   name: string;
   category: 'hospital' | 'police' | 'fire' | 'shelter' | 'assembly';
-  position: google.maps.LatLngLiteral;
+  position: { lat: number; lng: number };
   address: string;
   phone?: string;
   icon: React.ElementType;
@@ -24,7 +32,7 @@ interface AlertZone {
   title: string;
   severity: 'high' | 'medium' | 'low';
   type: string;
-  position: google.maps.LatLngLiteral;
+  position: { lat: number; lng: number };
   radius: number; // in meters
 }
 
@@ -32,7 +40,7 @@ const Map = () => {
   const { profileData } = useProfileData();
   const { user } = useAuth();
   const mapRef = useRef<HTMLDivElement>(null);
-  const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [map, setMap] = useState<any | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<EmergencyLocation | null>(null);
   const [locationFilter, setLocationFilter] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -119,7 +127,7 @@ const Map = () => {
       
       try {
         // Initialize the map
-        const googleMap = new google.maps.Map(mapRef.current as HTMLElement, {
+        const googleMap = new window.google.maps.Map(mapRef.current as HTMLElement, {
           center: chinhoyiCoordinates,
           zoom: 14,
           mapTypeControl: false,
@@ -163,18 +171,18 @@ const Map = () => {
   }, []);
   
   // Add emergency location markers to map
-  const addEmergencyMarkers = (googleMap: google.maps.Map) => {
+  const addEmergencyMarkers = (googleMap: any) => {
     const filteredLocations = locationFilter 
       ? emergencyLocations.filter(loc => loc.category === locationFilter) 
       : emergencyLocations;
     
     filteredLocations.forEach(location => {
-      const marker = new google.maps.Marker({
+      const marker = new window.google.maps.Marker({
         position: location.position,
         map: googleMap,
         title: location.name,
         icon: {
-          path: google.maps.SymbolPath.CIRCLE,
+          path: window.google.maps.SymbolPath.CIRCLE,
           fillColor: getCategoryColor(location.category),
           fillOpacity: 0.7,
           strokeColor: '#ffffff',
@@ -187,7 +195,7 @@ const Map = () => {
         setSelectedLocation(location);
         
         // Create and open info window
-        const infoWindow = new google.maps.InfoWindow({
+        const infoWindow = new window.google.maps.InfoWindow({
           content: `
             <div class="p-2">
               <h3 class="font-semibold">${location.name}</h3>
@@ -203,9 +211,9 @@ const Map = () => {
   };
   
   // Add alert zones to map
-  const addAlertZones = (googleMap: google.maps.Map) => {
+  const addAlertZones = (googleMap: any) => {
     alertZones.forEach(zone => {
-      const alertCircle = new google.maps.Circle({
+      const alertCircle = new window.google.maps.Circle({
         strokeColor: getAlertSeverityColor(zone.severity),
         strokeOpacity: 0.8,
         strokeWeight: 2,
@@ -377,12 +385,5 @@ const Map = () => {
     </div>
   );
 };
-
-// Add the google maps interface to prevent TypeScript errors
-declare global {
-  interface Window {
-    google: any;
-  }
-}
 
 export default Map;
