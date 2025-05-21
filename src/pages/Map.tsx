@@ -1,11 +1,15 @@
 
 import { useState, useEffect, useRef } from "react";
-import { MapPin, Navigation, Info, Hospital, Shield, Building, AlertTriangle } from "lucide-react";
+import { MapPin, Navigation, Info, Hospital, Shield, Building, AlertTriangle, Compass, Filter, Layers } from "lucide-react";
 import { useProfileData } from "@/hooks/use-profile-data";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 // Define Google Maps types
 declare global {
@@ -24,6 +28,11 @@ interface EmergencyLocation {
   address: string;
   phone?: string;
   icon: React.ElementType;
+  details?: {
+    services?: string[];
+    operatingHours?: string;
+    capacity?: string;
+  };
 }
 
 // Define alert zone interface
@@ -34,6 +43,8 @@ interface AlertZone {
   type: string;
   position: { lat: number; lng: number };
   radius: number; // in meters
+  description?: string;
+  timestamp?: string;
 }
 
 const Map = () => {
@@ -42,10 +53,13 @@ const Map = () => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<any | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<EmergencyLocation | null>(null);
+  const [selectedAlertZone, setSelectedAlertZone] = useState<AlertZone | null>(null);
   const [locationFilter, setLocationFilter] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [activeView, setActiveView] = useState<'map' | 'list'>('map');
+  const [activeLayers, setActiveLayers] = useState<string[]>(['emergency', 'alerts']);
   
   // Chinhoyi, Zimbabwe coordinates (default)
   const chinhoyiCoordinates = { lat: -17.3667, lng: 30.2000 };
@@ -59,7 +73,12 @@ const Map = () => {
       position: { lat: -17.3564, lng: 30.1971 },
       address: "Magamba Way, Chinhoyi, Zimbabwe",
       phone: "+263 67 2122275",
-      icon: Hospital
+      icon: Hospital,
+      details: {
+        services: ["Emergency Room", "Surgery", "Maternity", "Pediatrics"],
+        operatingHours: "24/7",
+        capacity: "250 beds"
+      }
     },
     {
       id: 2,
@@ -68,7 +87,11 @@ const Map = () => {
       position: { lat: -17.3667, lng: 30.1975 },
       address: "Main Street, Chinhoyi, Zimbabwe",
       phone: "+263 67 2122555",
-      icon: Shield
+      icon: Shield,
+      details: {
+        services: ["Emergency Response", "Crime Reporting", "Community Policing"],
+        operatingHours: "24/7"
+      }
     },
     {
       id: 3,
@@ -77,7 +100,11 @@ const Map = () => {
       position: { lat: -17.3627, lng: 30.1953 },
       address: "Fire Brigade Road, Chinhoyi, Zimbabwe",
       phone: "+263 67 2122911",
-      icon: Building
+      icon: Building,
+      details: {
+        services: ["Fire Response", "Rescue Services", "Fire Prevention"],
+        operatingHours: "24/7"
+      }
     },
     {
       id: 4,
@@ -86,7 +113,11 @@ const Map = () => {
       position: { lat: -17.3584, lng: 30.1986 },
       address: "School Road, Chinhoyi, Zimbabwe",
       phone: "+263 67 2124567",
-      icon: Building
+      icon: Building,
+      details: {
+        services: ["Temporary Housing", "Food Distribution", "Medical Aid"],
+        capacity: "150 people"
+      }
     },
     {
       id: 5,
@@ -94,7 +125,11 @@ const Map = () => {
       category: 'assembly',
       position: { lat: -17.3612, lng: 30.1932 },
       address: "Main Park, Chinhoyi, Zimbabwe",
-      icon: MapPin
+      icon: MapPin,
+      details: {
+        services: ["Meeting Point", "Emergency Coordination"],
+        capacity: "500 people"
+      }
     }
   ];
   
@@ -106,7 +141,9 @@ const Map = () => {
       severity: 'high',
       type: "weather",
       position: { lat: -17.361, lng: 30.191 },
-      radius: 800
+      radius: 800,
+      description: "Heavy rainfall has caused flooding in low-lying areas. Avoid this zone and seek higher ground.",
+      timestamp: new Date().toISOString()
     },
     {
       id: 2,
@@ -114,7 +151,9 @@ const Map = () => {
       severity: 'medium',
       type: "traffic",
       position: { lat: -17.372, lng: 30.204 },
-      radius: 300
+      radius: 300,
+      description: "Major road closed due to construction. Use alternate routes.",
+      timestamp: new Date(Date.now() - 86400000).toISOString() // 1 day ago
     }
   ];
 
@@ -192,11 +231,15 @@ const Map = () => {
           });
         }
         
-        // Add emergency locations markers
-        addEmergencyMarkers(googleMap);
+        // Add emergency locations markers if layer is active
+        if (activeLayers.includes('emergency')) {
+          addEmergencyMarkers(googleMap);
+        }
         
-        // Add alert zones
-        addAlertZones(googleMap);
+        // Add alert zones if layer is active
+        if (activeLayers.includes('alerts')) {
+          addAlertZones(googleMap);
+        }
         
       } catch (err) {
         console.error("Error initializing Google Maps:", err);
@@ -221,7 +264,7 @@ const Map = () => {
     } else {
       loadGoogleMaps();
     }
-  }, [userLocation]);
+  }, [userLocation, activeLayers]);
   
   // Add emergency location markers to map
   const addEmergencyMarkers = (googleMap: any) => {
@@ -304,6 +347,7 @@ const Map = () => {
             <p class="text-sm">Type: ${zone.type}</p>
             <p class="text-sm">Severity: ${zone.severity}</p>
             <p class="text-sm">Radius: ${zone.radius}m</p>
+            ${zone.description ? `<p class="text-sm mt-1">${zone.description}</p>` : ''}
           </div>
         `,
         position: zone.position
@@ -311,6 +355,7 @@ const Map = () => {
       
       alertCircle.addListener('click', () => {
         infoWindow.open(googleMap);
+        setSelectedAlertZone(zone);
       });
     });
   };
@@ -337,6 +382,43 @@ const Map = () => {
     }
   };
   
+  // Format timestamp for alerts
+  const formatTimestamp = (timestamp: string | undefined): string => {
+    if (!timestamp) return 'Unknown time';
+    
+    const date = new Date(timestamp);
+    return date.toLocaleString();
+  };
+  
+  // Calculate distance between two points in km
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Radius of the Earth in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+  
+  // Get distance from user to location
+  const getDistanceFromUser = (lat: number, lng: number): string => {
+    if (!userLocation) return "Unknown";
+    
+    const distance = calculateDistance(
+      userLocation.lat, 
+      userLocation.lng, 
+      lat, 
+      lng
+    );
+    
+    return distance < 1 
+      ? `${(distance * 1000).toFixed(0)}m` 
+      : `${distance.toFixed(1)}km`;
+  };
+  
   // Filter emergency locations by category
   const handleFilterChange = (filter: string | null) => {
     setLocationFilter(filter);
@@ -350,6 +432,24 @@ const Map = () => {
     }
   };
   
+  // Handle layer toggle
+  const handleLayerToggle = (values: string[]) => {
+    setActiveLayers(values);
+    
+    if (map) {
+      // Refresh map with selected layers
+      map.setOptions({ center: map.getCenter() });
+      
+      if (values.includes('emergency')) {
+        addEmergencyMarkers(map);
+      }
+      
+      if (values.includes('alerts')) {
+        addAlertZones(map);
+      }
+    }
+  };
+  
   return (
     <div className="flex flex-col h-full">
       <div className="page-header border-b border-border">
@@ -357,6 +457,50 @@ const Map = () => {
           <div className="flex items-center">
             <MapPin className="h-5 w-5 mr-2" />
             <h1 className="text-xl font-bold">Emergency Map</h1>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button size="sm" variant="outline" className="flex items-center">
+                  <Layers className="h-4 w-4 mr-1" />
+                  Layers
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="top">
+                <SheetHeader>
+                  <SheetTitle>Map Layers</SheetTitle>
+                  <SheetDescription>
+                    Choose which information to display on the map
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="py-6">
+                  <h3 className="text-sm font-medium mb-2">Available Layers</h3>
+                  <ToggleGroup 
+                    type="multiple" 
+                    value={activeLayers}
+                    onValueChange={handleLayerToggle}
+                    className="flex flex-wrap gap-2"
+                  >
+                    <ToggleGroupItem value="emergency" aria-label="Toggle emergency locations">
+                      <MapPin className="h-4 w-4 mr-1" />
+                      Emergency Locations
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="alerts" aria-label="Toggle alert zones">
+                      <AlertTriangle className="h-4 w-4 mr-1" />
+                      Alert Zones
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+              </SheetContent>
+            </Sheet>
+            
+            <Tabs value={activeView} onValueChange={(value) => setActiveView(value as 'map' | 'list')}>
+              <TabsList className="grid grid-cols-2 h-9">
+                <TabsTrigger value="map">Map</TabsTrigger>
+                <TabsTrigger value="list">List</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
         </div>
         <p className="text-muted-foreground mb-4">
@@ -411,82 +555,211 @@ const Map = () => {
       </div>
       
       <div className="flex-1 p-4 pb-24">
-        {/* Google Maps container */}
-        <div className="relative h-full rounded-lg overflow-hidden shadow-sm border border-border">
-          <div 
-            ref={mapRef} 
-            className="w-full h-full"
-          ></div>
-          
-          {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-              <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
-              <span className="ml-2">Loading map...</span>
-            </div>
-          )}
-          
-          {error && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/80">
-              <div className="text-center p-4">
-                <AlertTriangle className="h-8 w-8 mx-auto text-destructive mb-2" />
-                <h3 className="font-semibold mb-1">{error}</h3>
-                <p className="text-sm text-muted-foreground mb-3">Please check your internet connection and try again.</p>
-                <Button 
-                  size="sm" 
-                  onClick={() => window.location.reload()}
-                >
-                  Reload Map
-                </Button>
-              </div>
-            </div>
-          )}
-          
-          {/* Your current location button */}
-          {userLocation && (
-            <Button
-              className="absolute top-4 right-4 bg-primary/90 hover:bg-primary"
-              size="sm"
-              onClick={() => {
-                if (map) {
-                  map.panTo(userLocation);
-                  map.setZoom(15);
-                }
-              }}
-            >
-              <MapPin className="h-4 w-4 mr-2" />
-              Your Location
-            </Button>
-          )}
-          
-          {/* Map legend */}
-          <div className="absolute bottom-4 left-4 bg-background/80 rounded-md shadow-md backdrop-blur-sm p-3 text-xs">
-            <h4 className="font-semibold mb-2">Map Legend</h4>
-            <div className="space-y-1">
-              <div className="flex items-center">
-                <span className="w-3 h-3 rounded-full bg-blue-600 mr-2"></span>
-                <span>Hospitals</span>
-              </div>
-              <div className="flex items-center">
-                <span className="w-3 h-3 rounded-full bg-green-600 mr-2"></span>
-                <span>Police Stations</span>
-              </div>
-              <div className="flex items-center">
-                <span className="w-3 h-3 rounded-full bg-red-600 mr-2"></span>
-                <span>Fire Stations</span>
-              </div>
-              <div className="flex items-center">
-                <span className="w-3 h-3 rounded-full opacity-40 bg-red-500 mr-2"></span>
-                <span>Alert Zones</span>
-              </div>
+        <Tabs value={activeView} className="h-full">
+          {/* Map View */}
+          <TabsContent value="map" className="h-full m-0">
+            <div className="relative h-full rounded-lg overflow-hidden shadow-sm border border-border">
+              <div 
+                ref={mapRef} 
+                className="w-full h-full"
+              ></div>
+              
+              {isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+                  <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
+                  <span className="ml-2">Loading map...</span>
+                </div>
+              )}
+              
+              {error && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/80">
+                  <div className="text-center p-4">
+                    <AlertTriangle className="h-8 w-8 mx-auto text-destructive mb-2" />
+                    <h3 className="font-semibold mb-1">{error}</h3>
+                    <p className="text-sm text-muted-foreground mb-3">Please check your internet connection and try again.</p>
+                    <Button 
+                      size="sm" 
+                      onClick={() => window.location.reload()}
+                    >
+                      Reload Map
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
+              {/* Your current location button */}
               {userLocation && (
-                <div className="flex items-center">
-                  <span className="w-3 h-3 rounded-full bg-blue-500 mr-2"></span>
-                  <span>Your Location</span>
+                <Button
+                  className="absolute top-4 right-4 bg-primary/90 hover:bg-primary"
+                  size="sm"
+                  onClick={() => {
+                    if (map) {
+                      map.panTo(userLocation);
+                      map.setZoom(15);
+                    }
+                  }}
+                >
+                  <MapPin className="h-4 w-4 mr-2" />
+                  Your Location
+                </Button>
+              )}
+              
+              {/* Map legend */}
+              <div className="absolute bottom-4 left-4 bg-background/80 rounded-md shadow-md backdrop-blur-sm p-3 text-xs">
+                <h4 className="font-semibold mb-2">Map Legend</h4>
+                <div className="space-y-1">
+                  <div className="flex items-center">
+                    <span className="w-3 h-3 rounded-full bg-blue-600 mr-2"></span>
+                    <span>Hospitals</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="w-3 h-3 rounded-full bg-green-600 mr-2"></span>
+                    <span>Police Stations</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="w-3 h-3 rounded-full bg-red-600 mr-2"></span>
+                    <span>Fire Stations</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="w-3 h-3 rounded-full opacity-40 bg-red-500 mr-2"></span>
+                    <span>Alert Zones</span>
+                  </div>
+                  {userLocation && (
+                    <div className="flex items-center">
+                      <span className="w-3 h-3 rounded-full bg-blue-500 mr-2"></span>
+                      <span>Your Location</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Compass */}
+              <div className="absolute top-4 left-4 p-2 bg-background/80 backdrop-blur-sm rounded-md shadow-md">
+                <Compass className="h-5 w-5 text-foreground" />
+              </div>
+            </div>
+          </TabsContent>
+          
+          {/* List View */}
+          <TabsContent value="list" className="m-0 space-y-4 h-full overflow-y-auto pb-8">
+            <div>
+              <h2 className="text-lg font-semibold mb-2 flex items-center">
+                <AlertTriangle className="h-4 w-4 mr-2 text-crisis-red" /> 
+                Active Alerts
+              </h2>
+              {alertZones.length > 0 ? (
+                <div className="space-y-3">
+                  {alertZones.map(alert => (
+                    <Card key={alert.id} className="overflow-hidden">
+                      <div className={`h-1 ${
+                        alert.severity === 'high' ? 'bg-red-500' : 
+                        alert.severity === 'medium' ? 'bg-orange-500' : 'bg-yellow-500'
+                      }`}></div>
+                      <CardHeader className="pb-2">
+                        <div className="flex justify-between items-start">
+                          <CardTitle className="text-base">{alert.title}</CardTitle>
+                          <Badge variant={
+                            alert.severity === 'high' ? 'destructive' : 
+                            alert.severity === 'medium' ? 'default' : 'outline'
+                          }>
+                            {alert.severity}
+                          </Badge>
+                        </div>
+                        <CardDescription className="text-xs">
+                          {formatTimestamp(alert.timestamp)}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <p className="text-sm mb-2">{alert.description || "No description available"}</p>
+                        <div className="flex items-center text-xs text-muted-foreground">
+                          <MapPin className="h-3 w-3 mr-1" />
+                          {userLocation ? getDistanceFromUser(alert.position.lat, alert.position.lng) : "Unknown distance"}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 border rounded-lg bg-muted/20">
+                  <p className="text-muted-foreground">No active alerts</p>
                 </div>
               )}
             </div>
-          </div>
-        </div>
+            
+            <div>
+              <h2 className="text-lg font-semibold mb-2 flex items-center">
+                <MapPin className="h-4 w-4 mr-2" /> 
+                Emergency Locations
+              </h2>
+              <div className="space-y-3">
+                {emergencyLocations
+                  .filter(loc => !locationFilter || loc.category === locationFilter)
+                  .sort((a, b) => {
+                    if (!userLocation) return 0;
+                    
+                    const distA = calculateDistance(
+                      userLocation.lat, userLocation.lng, 
+                      a.position.lat, a.position.lng
+                    );
+                    const distB = calculateDistance(
+                      userLocation.lat, userLocation.lng, 
+                      b.position.lat, b.position.lng
+                    );
+                    
+                    return distA - distB;
+                  })
+                  .map(location => {
+                    const Icon = location.icon;
+                    return (
+                      <Card key={location.id}>
+                        <CardHeader className="pb-2">
+                          <div className="flex justify-between">
+                            <div className="flex items-center">
+                              <div className="mr-3 p-2 rounded-full bg-muted">
+                                <Icon className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <CardTitle className="text-base">{location.name}</CardTitle>
+                                <CardDescription className="text-xs">
+                                  {userLocation && (
+                                    <span className="flex items-center">
+                                      <Navigation className="h-3 w-3 mr-1" />
+                                      {getDistanceFromUser(location.position.lat, location.position.lng)}
+                                    </span>
+                                  )}
+                                </CardDescription>
+                              </div>
+                            </div>
+                            <Badge variant="outline">
+                              {location.category.charAt(0).toUpperCase() + location.category.slice(1)}
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <p className="text-sm mb-1">{location.address}</p>
+                          {location.phone && (
+                            <p className="text-sm font-medium">{location.phone}</p>
+                          )}
+                          {userLocation && (
+                            <Button size="sm" variant="outline" className="mt-2 text-xs" asChild>
+                              <a href={`https://www.google.com/maps/dir/?api=1&destination=${location.position.lat},${location.position.lng}`} 
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                <Navigation className="h-3 w-3 mr-1" />
+                                Directions
+                              </a>
+                            </Button>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })
+                }
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

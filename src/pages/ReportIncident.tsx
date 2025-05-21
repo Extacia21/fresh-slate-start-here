@@ -1,3 +1,4 @@
+
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, AlertTriangle, Camera, MapPin, AlertCircle, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,10 +12,12 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useCreateReport } from "@/services/reportsService";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useProfileData } from "@/hooks/use-profile-data";
 
 const ReportIncident = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { profileData } = useProfileData();
   const createReportMutation = useCreateReport();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [location, setLocation] = useState("");
@@ -28,6 +31,24 @@ const ReportIncident = () => {
   const [photoURLs, setPhotoURLs] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Pre-fill information if profile data is available
+  useEffect(() => {
+    if (profileData) {
+      // Pre-set location from profile if available
+      if (profileData.address || profileData.city) {
+        const profileLocation = [
+          profileData.address,
+          profileData.city,
+          profileData.state
+        ].filter(Boolean).join(", ");
+        
+        if (profileLocation && !location && !useCurrentLocation) {
+          setLocation(profileLocation);
+        }
+      }
+    }
+  }, [profileData]);
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -36,7 +57,7 @@ const ReportIncident = () => {
       return;
     }
     
-    if (!title || !location || !description) {
+    if (!title || !description) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -82,7 +103,7 @@ const ReportIncident = () => {
         type: incidentType,
         category: incidentType,
         severity: "medium", // Default severity
-        location,
+        location: location || "Unknown location",
         latitude: latitude || undefined,
         longitude: longitude || undefined,
         is_public: true,
@@ -299,7 +320,7 @@ const ReportIncident = () => {
             
             <div className="rounded-md border overflow-hidden">
               <LocationMap 
-                location={latitude && longitude ? `${latitude},${longitude}` : (location || "Current Location")} 
+                location={latitude && longitude ? `${latitude},${longitude}` : (location || "Current Location")}
                 interactive={!useCurrentLocation}
                 onLocationSelect={!useCurrentLocation ? handleLocationSelect : undefined}
               />
