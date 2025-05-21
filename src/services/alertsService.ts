@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
@@ -84,6 +83,34 @@ export const formatRelativeTime = (timestamp: string): string => {
   }
 };
 
+// Helper function to convert DB data to Alert object
+const mapDbAlertToAlert = (item: any): Alert => {
+  if (!item) throw new Error("Invalid alert data");
+  
+  // Create an alert object with safe property access
+  const alert: Alert = {
+    id: item.id || '',
+    title: item.title || '',
+    description: item.description || '',
+    type: item.alert_type || 'other',
+    alert_type: item.alert_type,
+    severity: (item.severity as 'critical' | 'high' | 'medium' | 'low') || 'medium',
+    created_at: item.created_at || new Date().toISOString(),
+    updated_at: item.updated_at || new Date().toISOString(),
+    latitude: typeof item.latitude === 'number' ? item.latitude : undefined,
+    longitude: typeof item.longitude === 'number' ? item.longitude : undefined,
+    radius: typeof item.radius === 'number' ? item.radius : undefined,
+    location: (typeof item.latitude === 'number' && typeof item.longitude === 'number') ? 
+      `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}` : undefined,
+    // Determine is_active from end_time or explicitly set to true if not available
+    is_active: item.end_time ? new Date(item.end_time) > new Date() : true,
+    source: item.source || "Official",
+    status: "Active"
+  };
+  
+  return alert;
+};
+
 // Get all alerts or a filtered subset
 export const useGetAlerts = (limit: number = 10) => {
   return useQuery({
@@ -103,29 +130,13 @@ export const useGetAlerts = (limit: number = 10) => {
       // Only process data if it exists
       if (data && data.length > 0) {
         for (let i = 0; i < data.length; i++) {
-          const item = data[i];
-          if (!item) continue;
-          
-          // Create each alert object with safe property access
-          const alert: Alert = {
-            id: item.id || '',
-            title: item.title || '',
-            description: item.description || '',
-            type: item.alert_type || 'other',
-            alert_type: item.alert_type,
-            severity: (item.severity as 'critical' | 'high' | 'medium' | 'low') || 'medium',
-            created_at: item.created_at || new Date().toISOString(),
-            updated_at: item.updated_at || new Date().toISOString(),
-            latitude: typeof item.latitude === 'number' ? item.latitude : undefined,
-            longitude: typeof item.longitude === 'number' ? item.longitude : undefined,
-            radius: typeof item.radius === 'number' ? item.radius : undefined,
-            location: (typeof item.latitude === 'number' && typeof item.longitude === 'number') ? 
-              `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}` : undefined,
-            is_active: Boolean(item.is_active),
-            source: item.source || undefined,
-            status: "Active"
-          };
-          alerts.push(alert);
+          try {
+            const alert = mapDbAlertToAlert(data[i]);
+            alerts.push(alert);
+          } catch (e) {
+            console.error("Error processing alert data:", e);
+            // Skip invalid alert data
+          }
         }
       }
       
@@ -142,7 +153,6 @@ export const useGetRecentAlerts = (limit: number = 10) => {
       const { data, error } = await supabase
         .from('alerts')
         .select('*')
-        .eq('is_active', true)
         .order('created_at', { ascending: false })
         .limit(limit);
         
@@ -154,29 +164,16 @@ export const useGetRecentAlerts = (limit: number = 10) => {
       // Only process data if it exists
       if (data && data.length > 0) {
         for (let i = 0; i < data.length; i++) {
-          const item = data[i];
-          if (!item) continue;
-          
-          // Create each alert object with safe property access
-          const alert: Alert = {
-            id: item.id || '',
-            title: item.title || '',
-            description: item.description || '',
-            type: item.alert_type || 'other',
-            alert_type: item.alert_type,
-            severity: (item.severity as 'critical' | 'high' | 'medium' | 'low') || 'medium',
-            created_at: item.created_at || new Date().toISOString(),
-            updated_at: item.updated_at || new Date().toISOString(),
-            latitude: typeof item.latitude === 'number' ? item.latitude : undefined,
-            longitude: typeof item.longitude === 'number' ? item.longitude : undefined,
-            radius: typeof item.radius === 'number' ? item.radius : undefined,
-            location: (typeof item.latitude === 'number' && typeof item.longitude === 'number') ? 
-              `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}` : undefined,
-            is_active: Boolean(item.is_active),
-            source: item.source || undefined,
-            status: "Active"
-          };
-          alerts.push(alert);
+          try {
+            const alert = mapDbAlertToAlert(data[i]);
+            // Only include active alerts
+            if (alert.is_active) {
+              alerts.push(alert);
+            }
+          } catch (e) {
+            console.error("Error processing alert data:", e);
+            // Skip invalid alert data
+          }
         }
       }
       
@@ -201,26 +198,13 @@ export const useGetAlertById = (alertId: string | undefined) => {
       if (error) throw new Error(error.message);
       if (!data) throw new Error('Alert not found');
       
-      // Create alert with explicit type to avoid deep type instantiation
-      const alert: Alert = {
-        id: data.id || '',
-        title: data.title || '',
-        description: data.description || '',
-        type: data.alert_type || 'other',
-        alert_type: data.alert_type,
-        severity: (data.severity as 'critical' | 'high' | 'medium' | 'low') || 'medium',
-        created_at: data.created_at || new Date().toISOString(),
-        updated_at: data.updated_at || new Date().toISOString(),
-        latitude: typeof data.latitude === 'number' ? data.latitude : undefined,
-        longitude: typeof data.longitude === 'number' ? data.longitude : undefined,
-        radius: typeof data.radius === 'number' ? data.radius : undefined,
-        location: (typeof data.latitude === 'number' && typeof data.longitude === 'number') ? 
-          `${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}` : undefined,
-        is_active: Boolean(data.is_active),
-        source: data.source || "Official",
-        status: "Active",
-        updates: []
-      };
+      // Use the helper function to map database data to Alert type
+      const alert = mapDbAlertToAlert(data);
+      
+      // Add empty updates array if not provided
+      if (!alert.updates) {
+        alert.updates = [];
+      }
       
       return alert;
     },
