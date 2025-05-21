@@ -1,6 +1,6 @@
 
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, AlertTriangle, FileText, Phone, User } from "lucide-react";
+import { Home, AlertTriangle, FileText, MapPin, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useScroll } from "@/contexts/ScrollContext";
 import { useEffect, useState } from "react";
@@ -50,9 +50,9 @@ const BottomNavigationEnhanced = () => {
       isExact: false,
     },
     { 
-      icon: Phone, 
-      label: "Contacts", 
-      path: "/app/contacts",
+      icon: MapPin, 
+      label: "Map", 
+      path: "/app/map",
       isExact: false,
     },
     { 

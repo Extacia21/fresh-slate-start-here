@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface AuthCredentials {
@@ -122,3 +121,23 @@ const authService = {
 };
 
 export default authService;
+
+// Add this function to prevent showing "Signed in successfully" toast on page refresh
+export const shouldShowSignInToast = (): boolean => {
+  // Check if user just signed in or if it's a page refresh
+  const lastSignIn = localStorage.getItem('lastSignIn');
+  const currentTime = new Date().getTime();
+  
+  if (lastSignIn) {
+    const timeDifference = currentTime - parseInt(lastSignIn);
+    // If it's been less than 5 seconds since sign in, show the toast
+    // Otherwise, it's likely a page refresh
+    return timeDifference < 5000;
+  }
+  
+  return false;
+}
+
+export const setLastSignInTime = (): void => {
+  localStorage.setItem('lastSignIn', new Date().getTime().toString());
+}
