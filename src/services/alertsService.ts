@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
@@ -97,27 +96,37 @@ export const useGetAlerts = (limit: number = 10) => {
         
       if (error) throw new Error(error.message);
       
-      // Map database fields to our Alert interface
-      const alerts: Alert[] = (data || []).map((item) => {
-        return {
-          id: item.id,
-          title: item.title,
-          description: item.description,
-          type: item.alert_type, // Map alert_type to type
-          alert_type: item.alert_type, // Keep original field
-          severity: item.severity,
-          created_at: item.created_at,
-          updated_at: item.updated_at,
-          latitude: item.latitude,
-          longitude: item.longitude, 
-          radius: item.radius,
-          // Create location string from coordinates
-          location: `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}`,
-          is_active: true, // Default to active
-          source: item.source,
-          status: "Active" // Default status
-        };
-      });
+      // Create an empty array with explicit type
+      const alerts: Alert[] = [];
+      
+      // Only process data if it exists
+      if (data && data.length > 0) {
+        // Use traditional for loop to avoid complex type inference issues
+        for (let i = 0; i < data.length; i++) {
+          const item = data[i];
+          // Create each alert object explicitly
+          const alert: Alert = {
+            id: item.id,
+            title: item.title,
+            description: item.description,
+            type: item.alert_type,
+            alert_type: item.alert_type,
+            severity: item.severity,
+            created_at: item.created_at,
+            updated_at: item.updated_at,
+            latitude: item.latitude,
+            longitude: item.longitude, 
+            radius: item.radius,
+            location: item.latitude && item.longitude ? 
+              `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}` : 
+              undefined,
+            is_active: true,
+            source: item.source || undefined,
+            status: "Active"
+          };
+          alerts.push(alert);
+        }
+      }
       
       return alerts;
     },
@@ -163,7 +172,7 @@ export const useGetRecentAlerts = (limit: number = 10) => {
               `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}` : 
               undefined,
             is_active: true,
-            source: item.source,
+            source: item.source || undefined,
             status: "Active"
           };
           alerts.push(alert);
@@ -175,7 +184,7 @@ export const useGetRecentAlerts = (limit: number = 10) => {
   });
 };
 
-// Get alert by ID
+// Get alert by ID - fixing the type instantiation issue
 export const useGetAlertById = (alertId: string | undefined) => {
   return useQuery({
     queryKey: ['alert', alertId],
@@ -190,7 +199,7 @@ export const useGetAlertById = (alertId: string | undefined) => {
         
       if (error) throw new Error(error.message);
       
-      // Map database fields to our Alert interface
+      // Create alert with explicit type to avoid deep type instantiation
       const alert: Alert = {
         id: data.id,
         title: data.title,
@@ -203,7 +212,9 @@ export const useGetAlertById = (alertId: string | undefined) => {
         latitude: data.latitude,
         longitude: data.longitude, 
         radius: data.radius,
-        location: `${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}`,
+        location: data.latitude && data.longitude ? 
+          `${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}` : 
+          undefined,
         is_active: true,
         source: data.source || "Official",
         status: "Active",
