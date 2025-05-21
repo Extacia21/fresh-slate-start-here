@@ -42,9 +42,9 @@ const Home = () => {
     }
   }, [alertsData]);
 
-  // Subscribe to new alerts
+  // Subscribe to new alerts - fix missing dependency by adding the updater function inside
   useEffect(() => {
-    const unsubscribe = useSubscribeToAlerts((newAlert) => {
+    const handleNewAlert = (newAlert: any) => {
       setRecentAlerts(prev => [newAlert, ...prev.slice(0, 4)]);
       
       toast({
@@ -52,7 +52,9 @@ const Home = () => {
         description: newAlert.title,
         duration: 5000,
       });
-    });
+    };
+    
+    const unsubscribe = useSubscribeToAlerts(handleNewAlert);
     
     return () => {
       unsubscribe();
