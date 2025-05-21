@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
@@ -21,7 +20,7 @@ export interface Alert {
   user_id?: string;
   expires_at?: string;
   photos?: string[];
-  // Adding missing properties
+  // Keep these properties
   source?: string;
   status?: string;
   updates?: { time: string; content: string }[];
@@ -97,7 +96,7 @@ export const useGetAlerts = (limit: number = 10) => {
         
       if (error) throw new Error(error.message);
       
-      // Map database fields to our Alert interface
+      // Map database fields to our Alert interface - Fixed the address property issue
       return (data || []).map((item) => ({
         id: item.id,
         title: item.title,
@@ -110,7 +109,8 @@ export const useGetAlerts = (limit: number = 10) => {
         latitude: item.latitude,
         longitude: item.longitude, 
         radius: item.radius,
-        location: item.address || `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}`,
+        // Create location string from coordinates if address doesn't exist
+        location: `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}`,
         is_active: true, // Default to active
         source: item.source,
         status: "Active" // Default status
@@ -133,7 +133,7 @@ export const useGetRecentAlerts = (limit: number = 10) => {
         
       if (error) throw new Error(error.message);
       
-      // Map database fields to our Alert interface
+      // Map database fields to our Alert interface - Fixed the address property issue
       return (data || []).map((item) => ({
         id: item.id,
         title: item.title,
@@ -146,7 +146,8 @@ export const useGetRecentAlerts = (limit: number = 10) => {
         latitude: item.latitude,
         longitude: item.longitude, 
         radius: item.radius,
-        location: item.address || `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}`,
+        // Create location string from coordinates
+        location: `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}`,
         is_active: true,
         source: item.source,
         status: "Active" // Default status
@@ -170,7 +171,7 @@ export const useGetAlertById = (alertId: string | undefined) => {
         
       if (error) throw new Error(error.message);
       
-      // Map database fields to our Alert interface
+      // Map database fields to our Alert interface - Fixed the address property issue
       const alert: Alert = {
         id: data.id,
         title: data.title,
@@ -183,7 +184,8 @@ export const useGetAlertById = (alertId: string | undefined) => {
         latitude: data.latitude,
         longitude: data.longitude, 
         radius: data.radius,
-        location: data.address || `${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}`,
+        // Create location string from coordinates
+        location: `${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}`,
         is_active: true,
         source: data.source || "Official",
         status: "Active", // Default status
