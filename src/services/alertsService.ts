@@ -97,9 +97,9 @@ export const useGetAlerts = (limit: number = 10) => {
         
       if (error) throw new Error(error.message);
       
-      // Map database fields to our Alert interface - Fixed the address property issue
-      return (data || []).map((item) => {
-        const alert: Alert = {
+      // Map database fields to our Alert interface
+      const alerts: Alert[] = (data || []).map((item) => {
+        return {
           id: item.id,
           title: item.title,
           description: item.description,
@@ -111,14 +111,15 @@ export const useGetAlerts = (limit: number = 10) => {
           latitude: item.latitude,
           longitude: item.longitude, 
           radius: item.radius,
-          // Create location string from coordinates if address doesn't exist
+          // Create location string from coordinates
           location: `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}`,
           is_active: true, // Default to active
           source: item.source,
           status: "Active" // Default status
         };
-        return alert;
       });
+      
+      return alerts;
     },
   });
 };
@@ -137,8 +138,10 @@ export const useGetRecentAlerts = (limit: number = 10) => {
         
       if (error) throw new Error(error.message);
       
-      // Map database fields to our Alert interface - Fixed the address property issue
-      return (data || []).map((item) => {
+      // Map database fields to our Alert interface
+      const alerts: Alert[] = [];
+      
+      for (const item of data || []) {
         const alert: Alert = {
           id: item.id,
           title: item.title,
@@ -151,14 +154,15 @@ export const useGetRecentAlerts = (limit: number = 10) => {
           latitude: item.latitude,
           longitude: item.longitude, 
           radius: item.radius,
-          // Create location string from coordinates
           location: `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}`,
           is_active: true,
           source: item.source,
-          status: "Active" // Default status
+          status: "Active"
         };
-        return alert;
-      });
+        alerts.push(alert);
+      }
+      
+      return alerts;
     },
   });
 };
@@ -178,25 +182,24 @@ export const useGetAlertById = (alertId: string | undefined) => {
         
       if (error) throw new Error(error.message);
       
-      // Map database fields to our Alert interface - Fixed the address property issue
+      // Map database fields to our Alert interface
       const alert: Alert = {
         id: data.id,
         title: data.title,
         description: data.description,
-        type: data.alert_type, // Map alert_type to type
-        alert_type: data.alert_type, // Keep original field
+        type: data.alert_type,
+        alert_type: data.alert_type,
         severity: data.severity,
         created_at: data.created_at,
         updated_at: data.updated_at,
         latitude: data.latitude,
         longitude: data.longitude, 
         radius: data.radius,
-        // Create location string from coordinates
         location: `${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}`,
         is_active: true,
         source: data.source || "Official",
-        status: "Active", // Default status
-        updates: [] // Initialize empty updates array
+        status: "Active",
+        updates: []
       };
       
       return alert;
