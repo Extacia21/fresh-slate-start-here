@@ -138,13 +138,16 @@ export const useGetRecentAlerts = (limit: number = 10) => {
         
       if (error) throw new Error(error.message);
       
-      // Explicitly create Alert array without nested mappings
+      // Create an empty array with explicit type
       const alerts: Alert[] = [];
       
-      if (data) {
+      // Only process data if it exists
+      if (data && data.length > 0) {
+        // Use traditional for loop to avoid complex type inference issues
         for (let i = 0; i < data.length; i++) {
           const item = data[i];
-          alerts.push({
+          // Create each alert object explicitly
+          const alert: Alert = {
             id: item.id,
             title: item.title,
             description: item.description,
@@ -156,11 +159,14 @@ export const useGetRecentAlerts = (limit: number = 10) => {
             latitude: item.latitude,
             longitude: item.longitude,
             radius: item.radius,
-            location: `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}`,
+            location: item.latitude && item.longitude ? 
+              `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}` : 
+              undefined,
             is_active: true,
             source: item.source,
             status: "Active"
-          });
+          };
+          alerts.push(alert);
         }
       }
       
