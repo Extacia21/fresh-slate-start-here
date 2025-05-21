@@ -138,28 +138,30 @@ export const useGetRecentAlerts = (limit: number = 10) => {
         
       if (error) throw new Error(error.message);
       
-      // Map database fields to our Alert interface
+      // Explicitly create Alert array without nested mappings
       const alerts: Alert[] = [];
       
-      for (const item of data || []) {
-        const alert: Alert = {
-          id: item.id,
-          title: item.title,
-          description: item.description,
-          type: item.alert_type, // Map alert_type to type
-          alert_type: item.alert_type, // Keep original field
-          severity: item.severity,
-          created_at: item.created_at,
-          updated_at: item.updated_at,
-          latitude: item.latitude,
-          longitude: item.longitude, 
-          radius: item.radius,
-          location: `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}`,
-          is_active: true,
-          source: item.source,
-          status: "Active"
-        };
-        alerts.push(alert);
+      if (data) {
+        for (let i = 0; i < data.length; i++) {
+          const item = data[i];
+          alerts.push({
+            id: item.id,
+            title: item.title,
+            description: item.description,
+            type: item.alert_type,
+            alert_type: item.alert_type,
+            severity: item.severity,
+            created_at: item.created_at,
+            updated_at: item.updated_at,
+            latitude: item.latitude,
+            longitude: item.longitude,
+            radius: item.radius,
+            location: `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}`,
+            is_active: true,
+            source: item.source,
+            status: "Active"
+          });
+        }
       }
       
       return alerts;
