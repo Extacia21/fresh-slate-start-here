@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import type { Report } from "@/integrations/supabase/reports";
@@ -8,10 +7,23 @@ import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
 // Since we don't have an alerts table, we'll use reports as alerts
-export interface Alert extends Omit<Report, 'category'> {
+export interface Alert {
+  id?: string;
+  title: string;
+  description: string;
+  location?: string;
+  latitude?: number;
+  longitude?: number;
+  type: string;
+  is_public: boolean;
   severity: "critical" | "high" | "medium" | "low";
+  status?: 'active' | 'resolved' | 'archived';
+  created_at?: string;
+  updated_at?: string;
   source?: "official" | "user-reported" | string;
+  photos?: string[];
   updates?: Array<{ time: string; content: string }>;
+  user_id?: string;
 }
 
 // Store alerts in memory to prevent losing them
@@ -51,6 +63,16 @@ export const alertTypeColors = {
   }
 };
 
+// Convert a report to an alert format
+const reportToAlert = (report: Report): Alert => {
+  return {
+    ...report,
+    severity: report.severity || "medium",
+    source: report.user_id ? "user-reported" : "official",
+    updates: report.updates || []
+  };
+};
+
 export const useGetAlerts = () => {
   const [localAlerts, setLocalAlerts] = useState<Alert[]>(alertsCache);
 
@@ -65,15 +87,10 @@ export const useGetAlerts = () => {
       }
       
       // Convert reports to alerts
-      const alerts = data?.map(report => ({
-        ...report,
-        severity: report.severity || "medium",
-        source: report.user_id ? "user-reported" : "official",
-        updates: []
-      })) as Alert[];
+      const alerts = data ? data.map(reportToAlert) : [];
 
       // Update our cache
-      alertsCache = alerts || [];
+      alertsCache = alerts;
       
       return alerts;
     },
@@ -91,12 +108,7 @@ export const useGetAlerts = () => {
   useEffect(() => {
     const handleNewAlert = (event: CustomEvent) => {
       if (event.detail && event.detail.type === 'new-report') {
-        const newAlert: Alert = {
-          ...event.detail.report,
-          severity: event.detail.report.severity || "medium",
-          source: event.detail.report.user_id ? "user-reported" : "official",
-          updates: []
-        };
+        const newAlert = reportToAlert(event.detail.report);
         
         // Update local state with new alert at the top
         setLocalAlerts(prev => {
@@ -140,16 +152,13 @@ export const useGetRecentAlerts = (limit = 10) => {
       
       // Sort by created_at (newest first) and limit
       const alerts = data
-        ?.sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime())
-        .slice(0, limit)
-        .map(report => ({
-          ...report,
-          severity: report.severity || "medium",
-          source: report.user_id ? "user-reported" : "official",
-          updates: []
-        }));
+        ? data
+            .sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime())
+            .slice(0, limit)
+            .map(reportToAlert)
+        : [];
         
-      return alerts as Alert[];
+      return alerts;
     },
     refetchInterval: 15000, // Refetch every 15 seconds for simulation
   });
@@ -165,12 +174,7 @@ export const useGetRecentAlerts = (limit = 10) => {
   useEffect(() => {
     const handleNewAlert = (event: CustomEvent) => {
       if (event.detail && event.detail.type === 'new-report') {
-        const newAlert: Alert = {
-          ...event.detail.report,
-          severity: event.detail.report.severity || "medium",
-          source: event.detail.report.user_id ? "user-reported" : "official",
-          updates: []
-        };
+        const newAlert = reportToAlert(event.detail.report);
         
         // Add new alert to local state at the top
         setLocalAlerts(prev => {
@@ -227,12 +231,7 @@ export const useGetAlertById = (id: string | undefined) => {
         throw new Error("Alert not found");
       }
       
-      return {
-        ...data,
-        severity: data.severity || "medium",
-        source: data.user_id ? "user-reported" : "official",
-        updates: []
-      } as Alert;
+      return reportToAlert(data);
     },
     enabled: !!id,
   });
@@ -283,12 +282,7 @@ export const subscribeToAlerts = (callback: (alert: Alert) => void) => {
   const handleReportCreated = (event: any) => {
     if (event.detail && event.detail.type === 'new-report') {
       // Convert report to alert format
-      const alert: Alert = {
-        ...event.detail.report,
-        severity: event.detail.report.severity || "medium",
-        source: event.detail.report.user_id ? "user-reported" : "official",
-        updates: []
-      };
+      const alert = reportToAlert(event.detail.report);
       callback(alert);
     }
   };

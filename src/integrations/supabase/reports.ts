@@ -22,78 +22,69 @@ export interface Report {
   updates?: Array<{ time: string; content: string }>;
 }
 
-// Create a type for the Supabase Tables that includes our custom reports table
-type TablesWithReports = Database['public']['Tables'] & {
-  reports: {
-    Row: Omit<Report, 'updates'> & { id: string; created_at: string; updated_at: string };
-    Insert: Omit<Report, 'id' | 'created_at' | 'updated_at' | 'updates'>;
-    Update: Partial<Omit<Report, 'id' | 'created_at' | 'updated_at' | 'updates'>>;
-  }
-};
-
+// Use type assertion to allow accessing the reports table
 export const getReports = async () => {
   const { data, error } = await supabase
-    .from('reports' as keyof TablesWithReports)
+    .from('reports')
     .select('*')
     .order('created_at', { ascending: false });
   
-  return { data, error };
+  return { data: data as Report[] | null, error };
 };
 
 export const getPublicReports = async () => {
   const { data, error } = await supabase
-    .from('reports' as keyof TablesWithReports)
+    .from('reports')
     .select('*')
     .eq('is_public', true)
     .order('created_at', { ascending: false });
   
-  return { data, error };
+  return { data: data as Report[] | null, error };
 };
 
 export const getReportById = async (id: string) => {
   const { data, error } = await supabase
-    .from('reports' as keyof TablesWithReports)
+    .from('reports')
     .select('*')
     .eq('id', id)
     .single();
   
-  return { data, error };
+  return { data: data as Report | null, error };
 };
 
 export const createReport = async (report: Omit<Report, 'id' | 'created_at' | 'updated_at'>) => {
   // Create the report
   const { data, error } = await supabase
-    .from('reports' as keyof TablesWithReports)
-    .insert(report as any)
+    .from('reports')
+    .insert(report)
     .select()
     .single();
   
   // Also create an alert from this report
   if (data && !error) {
-    const alertData = {
-      alert_type: report.type as Database['public']['Enums']['alert_type'],
-      title: report.title,
-      description: report.description,
-      location: report.location,
-      latitude: report.latitude,
-      longitude: report.longitude,
-      severity: report.severity as Database['public']['Enums']['alert_severity'],
-      report_id: data.id,
-      photos: report.photos,
-      radius: 0, // Default radius
-      is_active: true
-    };
-    
-    // Create the alert (don't wait for this to complete)
-    supabase
-      .from('alerts')
-      .insert(alertData)
-      .then(response => {
-        if (response.error) {
-          console.error("Error creating alert from report:", response.error);
-        }
-      });
+    try {
+      const alertData = {
+        alert_type: report.type as Database['public']['Enums']['alert_type'],
+        title: report.title,
+        description: report.description,
+        location: report.location,
+        latitude: report.latitude,
+        longitude: report.longitude,
+        severity: report.severity as Database['public']['Enums']['alert_severity'],
+        report_id: data.id,
+        photos: report.photos,
+        radius: 0, // Default radius
+        is_active: true
+      };
+      
+      // Create the alert (don't wait for this to complete)
+      await supabase
+        .from('alerts')
+        .insert(alertData);
+    } catch (alertError) {
+      console.error("Error creating alert from report:", alertError);
+    }
   }
   
-  return { data, error };
+  return { data: data as Report | null, error };
 };

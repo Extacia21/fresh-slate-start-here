@@ -57,7 +57,7 @@ export const useCreateReport = () => {
       const newReport = {
         ...report,
         user_id: user.id,
-        status: 'active'
+        status: 'active' as const
       };
       
       const { data, error } = await createReport(newReport);
