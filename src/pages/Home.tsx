@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, MapPin, FileText, Phone, MessageCircle, Shield, AlertTriangle, Cloud, CloudRain, CloudLightning, Info } from "lucide-react";
 import QuickAction from "@/components/common/QuickAction";
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfileData } from "@/hooks/use-profile-data";
-import { useGetRecentAlerts, useSubscribeToAlerts } from "@/services/alertsService";
+import { useGetRecentAlerts, subscribeToAlerts } from "@/services/alertsService";
 
 const Home = () => {
   const { user } = useAuth();
@@ -42,24 +42,28 @@ const Home = () => {
     }
   }, [alertsData]);
 
-  // Subscribe to new alerts - fix missing dependency by adding the updater function inside
-  useEffect(() => {
-    const handleNewAlert = (newAlert: any) => {
-      setRecentAlerts(prev => [newAlert, ...prev.slice(0, 4)]);
-      
-      toast({
-        title: `New ${newAlert.type} Alert`,
-        description: newAlert.title,
-        duration: 5000,
-      });
-    };
+  // Define alert handler callback with useCallback to prevent unnecessary recreations
+  const handleNewAlert = useCallback((newAlert: any) => {
+    setRecentAlerts(prev => [newAlert, ...prev.slice(0, 4)]);
     
-    const unsubscribe = useSubscribeToAlerts(handleNewAlert);
+    toast({
+      title: `New ${newAlert.type} Alert`,
+      description: newAlert.title,
+      duration: 5000,
+    });
+  }, []);
+
+  // Subscribe to new alerts
+  useEffect(() => {
+    // Use the non-hook version of subscribeToAlerts
+    const unsubscribe = subscribeToAlerts(handleNewAlert);
     
     return () => {
-      unsubscribe();
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
-  }, []);
+  }, [handleNewAlert]);
 
   // Mock user location for sharing
   const userLocation = "37.7749,-122.4194"; // San Francisco coordinates

@@ -273,7 +273,7 @@ export const useGetAlertById = (id: string | undefined) => {
   };
 };
 
-// Separate subscription function from hook
+// Separate subscription function from hook - FIX: Remove useEffect from this function
 export const subscribeToAlerts = (callback: (alert: Alert) => void) => {
   const handleReportCreated = (event: CustomEvent<{type: string, report: Report}>) => {
     if (event.detail && event.detail.type === 'new-report') {
@@ -293,10 +293,9 @@ export const subscribeToAlerts = (callback: (alert: Alert) => void) => {
 
 // Hook that uses the subscribe function
 export const useSubscribeToAlerts = (callback: (alert: Alert) => void) => {
-  useEffect(() => {
-    const unsubscribe = subscribeToAlerts(callback);
-    return unsubscribe;
-  }, [callback]);
+  // FIX: Move the callback function inside the component that uses this hook
+  // and pass it through a ref or useCallback to prevent infinite loops
+  return subscribeToAlerts(callback);
 };
 
 // Format timestamp relative to current time
