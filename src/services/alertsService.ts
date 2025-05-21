@@ -1,3 +1,4 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
@@ -97,24 +98,27 @@ export const useGetAlerts = (limit: number = 10) => {
       if (error) throw new Error(error.message);
       
       // Map database fields to our Alert interface - Fixed the address property issue
-      return (data || []).map((item) => ({
-        id: item.id,
-        title: item.title,
-        description: item.description,
-        type: item.alert_type, // Map alert_type to type
-        alert_type: item.alert_type, // Keep original field
-        severity: item.severity,
-        created_at: item.created_at,
-        updated_at: item.updated_at,
-        latitude: item.latitude,
-        longitude: item.longitude, 
-        radius: item.radius,
-        // Create location string from coordinates if address doesn't exist
-        location: `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}`,
-        is_active: true, // Default to active
-        source: item.source,
-        status: "Active" // Default status
-      })) as Alert[];
+      return (data || []).map((item) => {
+        const alert: Alert = {
+          id: item.id,
+          title: item.title,
+          description: item.description,
+          type: item.alert_type, // Map alert_type to type
+          alert_type: item.alert_type, // Keep original field
+          severity: item.severity,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          latitude: item.latitude,
+          longitude: item.longitude, 
+          radius: item.radius,
+          // Create location string from coordinates if address doesn't exist
+          location: `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}`,
+          is_active: true, // Default to active
+          source: item.source,
+          status: "Active" // Default status
+        };
+        return alert;
+      });
     },
   });
 };
@@ -134,24 +138,27 @@ export const useGetRecentAlerts = (limit: number = 10) => {
       if (error) throw new Error(error.message);
       
       // Map database fields to our Alert interface - Fixed the address property issue
-      return (data || []).map((item) => ({
-        id: item.id,
-        title: item.title,
-        description: item.description,
-        type: item.alert_type, // Map alert_type to type
-        alert_type: item.alert_type, // Keep original field
-        severity: item.severity,
-        created_at: item.created_at,
-        updated_at: item.updated_at,
-        latitude: item.latitude,
-        longitude: item.longitude, 
-        radius: item.radius,
-        // Create location string from coordinates
-        location: `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}`,
-        is_active: true,
-        source: item.source,
-        status: "Active" // Default status
-      })) as Alert[];
+      return (data || []).map((item) => {
+        const alert: Alert = {
+          id: item.id,
+          title: item.title,
+          description: item.description,
+          type: item.alert_type, // Map alert_type to type
+          alert_type: item.alert_type, // Keep original field
+          severity: item.severity,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          latitude: item.latitude,
+          longitude: item.longitude, 
+          radius: item.radius,
+          // Create location string from coordinates
+          location: `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}`,
+          is_active: true,
+          source: item.source,
+          status: "Active" // Default status
+        };
+        return alert;
+      });
     },
   });
 };
