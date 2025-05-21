@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Bell, Filter } from "lucide-react";
 import AlertCard from "@/components/common/AlertCard";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
-import { useGetAlerts, useSubscribeToAlerts, Alert, formatRelativeTime } from "@/services/alertsService";
+import { useGetAlerts, useSubscribeToAlerts, Alert } from "@/services/alertsService";
 import { toast } from "sonner";
 
 const Alerts = () => {
@@ -22,33 +22,36 @@ const Alerts = () => {
     }
   }, [alertsData]);
 
-  // Handle new alert callback
-  const handleNewAlert = useCallback((newAlert: Alert) => {
-    setAlerts(prevAlerts => {
-      // Check if alert already exists to prevent duplicates
-      if (prevAlerts.some(alert => alert.id === newAlert.id)) {
-        return prevAlerts;
-      }
-      
-      // Add new alert and sort by creation date
-      const updatedAlerts = [newAlert, ...prevAlerts]
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      
-      // Show toast notification for new alert
-      toast.info(`New ${newAlert.source === 'user-reported' ? 'User Report' : 'Alert'}: ${newAlert.title}`, {
-        description: newAlert.description.substring(0, 50) + (newAlert.description.length > 50 ? '...' : ''),
-        action: {
-          label: 'View',
-          onClick: () => navigate(`/app/alerts/${newAlert.id}`),
-        },
+  // Subscribe to new alerts
+  useEffect(() => {
+    const unsubscribe = useSubscribeToAlerts((newAlert) => {
+      setAlerts(prevAlerts => {
+        // Check if alert already exists to prevent duplicates
+        if (prevAlerts.some(alert => alert.id === newAlert.id)) {
+          return prevAlerts;
+        }
+        
+        // Add new alert and sort by creation date
+        const updatedAlerts = [newAlert, ...prevAlerts]
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        
+        // Show toast notification for new alert
+        toast.info(`New ${newAlert.source === 'user-reported' ? 'User Report' : 'Alert'}: ${newAlert.title}`, {
+          description: newAlert.description.substring(0, 50) + (newAlert.description.length > 50 ? '...' : ''),
+          action: {
+            label: 'View',
+            onClick: () => navigate(`/app/alerts/${newAlert.id}`),
+          },
+        });
+        
+        return updatedAlerts;
       });
-      
-      return updatedAlerts;
     });
+    
+    return () => {
+      unsubscribe();
+    };
   }, [navigate]);
-  
-  // Subscribe to new alerts using the hook properly
-  useSubscribeToAlerts(handleNewAlert);
 
   // Apply filters
   useEffect(() => {
@@ -186,7 +189,24 @@ const Alerts = () => {
 };
 
 function formatTimestamp(timestamp: string): string {
-  return formatRelativeTime(timestamp);
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  
+  if (diffMins < 1) {
+    return "Just now";
+  } else if (diffMins < 60) {
+    return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
+  } else if (diffHours < 24) {
+    return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+  } else if (diffDays < 7) {
+    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+  } else {
+    return date.toLocaleDateString();
+  }
 }
 
 export default Alerts;
