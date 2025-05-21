@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, AlertTriangle, Camera, MapPin, AlertCircle, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,12 +11,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useCreateReport } from "@/services/reportsService";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useProfileData } from "@/hooks/use-profile-data";
 
 const ReportIncident = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { profileData } = useProfileData();
   const createReportMutation = useCreateReport();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [location, setLocation] = useState("");
@@ -31,24 +28,6 @@ const ReportIncident = () => {
   const [photoURLs, setPhotoURLs] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Pre-fill information if profile data is available
-  useEffect(() => {
-    if (profileData) {
-      // Pre-set location from profile if available
-      if (profileData.address || profileData.city) {
-        const profileLocation = [
-          profileData.address,
-          profileData.city,
-          profileData.state
-        ].filter(Boolean).join(", ");
-        
-        if (profileLocation && !location && !useCurrentLocation) {
-          setLocation(profileLocation);
-        }
-      }
-    }
-  }, [profileData]);
-  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -57,7 +36,7 @@ const ReportIncident = () => {
       return;
     }
     
-    if (!title || !description) {
+    if (!title || !location || !description) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -96,14 +75,12 @@ const ReportIncident = () => {
         toast.success("Images uploaded successfully");
       }
       
-      // Create report
+      // Create report only (removed alert creation)
       await createReportMutation.mutateAsync({
         title,
         description,
-        type: incidentType,
         category: incidentType,
-        severity: "medium", // Default severity
-        location: location || "Unknown location",
+        location,
         latitude: latitude || undefined,
         longitude: longitude || undefined,
         is_public: true,
@@ -161,26 +138,21 @@ const ReportIncident = () => {
     }
   }, [useCurrentLocation]);
   
-  // Fixed LocationMap onLocationSelect handler to match the expected signature
-  const handleLocationSelect = (lat: number, lng: number, address: string) => {
-    setLatitude(lat);
-    setLongitude(lng);
+  const handleLocationSelect = (pos: { lat: number; lng: number }) => {
+    setLatitude(pos.lat);
+    setLongitude(pos.lng);
     
-    if (address) {
-      setLocation(address);
-    } else {
-      // Try to get address from coordinates if not provided
-      fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=AIzaSyDp9ZnLPvebOjH8MYt8f0zpqYK4mRSlAts`)
-        .then(response => response.json())
-        .then(data => {
-          if (data.results && data.results[0]) {
-            setLocation(data.results[0].formatted_address);
-          }
-        })
-        .catch(error => {
-          console.error("Error getting address:", error);
-        });
-    }
+    // Try to get address from coordinates
+    fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${pos.lat},${pos.lng}&key=AIzaSyDp9ZnLPvebOjH8MYt8f0zpqYK4mRSlAts`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.results && data.results[0]) {
+          setLocation(data.results[0].formatted_address);
+        }
+      })
+      .catch(error => {
+        console.error("Error getting address:", error);
+      });
   };
   
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -320,8 +292,9 @@ const ReportIncident = () => {
             
             <div className="rounded-md border overflow-hidden">
               <LocationMap 
-                location={latitude && longitude ? `${latitude},${longitude}` : (location || "Current Location")}
-                interactive={!useCurrentLocation}
+                location={location || "Current Location"} 
+                latitude={latitude || undefined}
+                longitude={longitude || undefined}
                 onLocationSelect={!useCurrentLocation ? handleLocationSelect : undefined}
               />
             </div>
