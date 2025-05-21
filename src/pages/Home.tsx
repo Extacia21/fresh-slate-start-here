@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, MapPin, FileText, Phone, MessageCircle, Shield, AlertTriangle, Cloud, CloudRain, CloudLightning, Info } from "lucide-react";
 import QuickAction from "@/components/common/QuickAction";
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfileData } from "@/hooks/use-profile-data";
-import { useGetRecentAlerts, useSubscribeToAlerts, Alert } from "@/services/alertsService";
+import { useGetRecentAlerts, useSubscribeToAlerts } from "@/services/alertsService";
 
 const Home = () => {
   const { user } = useAuth();
@@ -24,16 +24,13 @@ const Home = () => {
   // Set user name from profile data
   useEffect(() => {
     if (profileData) {
-      // Use display_name from profile if available, otherwise fallback to first_name or email
+      // Use display_name from auth if available, otherwise fallback to first_name or email
       const name = profileData.display_name || 
-                  (profileData.first_name ? 
-                    (profileData.last_name ? 
-                      `${profileData.first_name} ${profileData.last_name}` : 
-                      profileData.first_name) : 
-                    user?.user_metadata?.full_name || 
-                    user?.user_metadata?.name || 
-                    user?.email?.split('@')[0] || 
-                    'User');
+                  profileData.first_name || 
+                  user?.user_metadata?.full_name || 
+                  user?.user_metadata?.name || 
+                  user?.email?.split('@')[0] || 
+                  'User';
       setUserName(name);
     }
   }, [profileData, user]);
@@ -45,19 +42,22 @@ const Home = () => {
     }
   }, [alertsData]);
 
-  // Handle new alert callback
-  const handleNewAlert = useCallback((newAlert: Alert) => {
-    setRecentAlerts(prev => [newAlert, ...prev.slice(0, 4)]);
-    
-    toast({
-      title: `New ${newAlert.type} Alert`,
-      description: newAlert.title,
-      duration: 5000,
+  // Subscribe to new alerts
+  useEffect(() => {
+    const unsubscribe = useSubscribeToAlerts((newAlert) => {
+      setRecentAlerts(prev => [newAlert, ...prev.slice(0, 4)]);
+      
+      toast({
+        title: `New ${newAlert.type} Alert`,
+        description: newAlert.title,
+        duration: 5000,
+      });
     });
+    
+    return () => {
+      unsubscribe();
+    };
   }, []);
-  
-  // Subscribe to new alerts using the hook properly
-  useSubscribeToAlerts(handleNewAlert);
 
   // Mock user location for sharing
   const userLocation = "37.7749,-122.4194"; // San Francisco coordinates
