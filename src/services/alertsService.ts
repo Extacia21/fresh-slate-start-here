@@ -106,7 +106,7 @@ export const useGetAlerts = () => {
 
   // Handle new alert subscription
   useEffect(() => {
-    const handleNewAlert = (event: CustomEvent) => {
+    const handleNewAlert = (event: CustomEvent<{type: string, report: Report}>) => {
       if (event.detail && event.detail.type === 'new-report') {
         const newAlert = reportToAlert(event.detail.report);
         
@@ -172,7 +172,7 @@ export const useGetRecentAlerts = (limit = 10) => {
 
   // Handle new alert subscription
   useEffect(() => {
-    const handleNewAlert = (event: CustomEvent) => {
+    const handleNewAlert = (event: CustomEvent<{type: string, report: Report}>) => {
       if (event.detail && event.detail.type === 'new-report') {
         const newAlert = reportToAlert(event.detail.report);
         
@@ -245,7 +245,7 @@ export const useGetAlertById = (id: string | undefined) => {
 
   // Handle alert updates
   useEffect(() => {
-    const handleAlertUpdate = (event: CustomEvent) => {
+    const handleAlertUpdate = (event: CustomEvent<{type: string, report: Report}>) => {
       if (event.detail && 
           event.detail.type === 'update-report' && 
           event.detail.report.id === id) {
@@ -253,11 +253,7 @@ export const useGetAlertById = (id: string | undefined) => {
           if (!prevAlert) return null;
           return {
             ...prevAlert,
-            ...event.detail.report,
-            // Preserve alert-specific fields
-            severity: event.detail.report.severity || prevAlert.severity,
-            source: event.detail.report.source || prevAlert.source,
-            updates: prevAlert.updates || []
+            ...reportToAlert(event.detail.report),
           };
         });
       }
@@ -279,7 +275,7 @@ export const useGetAlertById = (id: string | undefined) => {
 
 // Separate subscription function from hook
 export const subscribeToAlerts = (callback: (alert: Alert) => void) => {
-  const handleReportCreated = (event: any) => {
+  const handleReportCreated = (event: CustomEvent<{type: string, report: Report}>) => {
     if (event.detail && event.detail.type === 'new-report') {
       // Convert report to alert format
       const alert = reportToAlert(event.detail.report);
@@ -287,11 +283,11 @@ export const subscribeToAlerts = (callback: (alert: Alert) => void) => {
     }
   };
 
-  window.addEventListener('report-created', handleReportCreated);
+  window.addEventListener('report-created', handleReportCreated as EventListener);
   
   // Return cleanup function
   return () => {
-    window.removeEventListener('report-created', handleReportCreated);
+    window.removeEventListener('report-created', handleReportCreated as EventListener);
   };
 };
 

@@ -22,41 +22,50 @@ export interface Report {
   updates?: Array<{ time: string; content: string }>;
 }
 
+// Declare explicit types for supabase operations
+type ReportResponse = Awaited<ReturnType<typeof supabase.from>['select']>;
+
 // Use type assertion to allow accessing the reports table
 export const getReports = async () => {
   const { data, error } = await supabase
-    .from('reports')
+    .from('reports' as any)
     .select('*')
     .order('created_at', { ascending: false });
   
-  return { data: data as Report[] | null, error };
+  return { data: data as unknown as Report[] | null, error };
 };
 
 export const getPublicReports = async () => {
   const { data, error } = await supabase
-    .from('reports')
+    .from('reports' as any)
     .select('*')
     .eq('is_public', true)
     .order('created_at', { ascending: false });
   
-  return { data: data as Report[] | null, error };
+  return { data: data as unknown as Report[] | null, error };
 };
 
 export const getReportById = async (id: string) => {
   const { data, error } = await supabase
-    .from('reports')
+    .from('reports' as any)
     .select('*')
     .eq('id', id)
     .single();
   
-  return { data: data as Report | null, error };
+  return { data: data as unknown as Report | null, error };
 };
 
 export const createReport = async (report: Omit<Report, 'id' | 'created_at' | 'updated_at'>) => {
   // Create the report
   const { data, error } = await supabase
-    .from('reports')
-    .insert(report)
+    .from('reports' as any)
+    .insert({
+      ...report,
+      // Map report type to alert_type for alerts table
+      alert_type: report.type as Database['public']['Enums']['alert_type'],
+      // Add defaults for required alert fields
+      radius: 0,
+    } as any)
     .select()
     .single();
   
@@ -86,5 +95,5 @@ export const createReport = async (report: Omit<Report, 'id' | 'created_at' | 'u
     }
   }
   
-  return { data: data as Report | null, error };
+  return { data: data as unknown as Report | null, error };
 };
