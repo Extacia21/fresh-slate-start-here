@@ -1,11 +1,9 @@
-
 import React, { useState, useEffect } from "react";
 import { Bell, AlertTriangle, Info, CloudRain, CloudLightning, MapPin, Clock, Shield } from "lucide-react";
 import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
-import { alertTypeColors } from "@/services/alertsService";
-import { formatRelativeTime } from "@/services/alertsService";
+import { alertTypeColors, formatRelativeTime } from "@/services/alertsService";
 
 type AlertSeverity = "critical" | "high" | "medium" | "low";
 

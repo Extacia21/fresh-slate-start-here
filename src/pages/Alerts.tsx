@@ -4,7 +4,7 @@ import AlertCard from "@/components/common/AlertCard";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
-import { useGetAlerts, useSubscribeToAlerts, Alert } from "@/services/alertsService";
+import { useGetAlerts, useSubscribeToAlerts, Alert, formatRelativeTime } from "@/services/alertsService";
 import { toast } from "sonner";
 
 const Alerts = () => {
@@ -186,24 +186,7 @@ const Alerts = () => {
 };
 
 function formatTimestamp(timestamp: string): string {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-  
-  if (diffMins < 1) {
-    return "Just now";
-  } else if (diffMins < 60) {
-    return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
-  } else if (diffHours < 24) {
-    return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
-  } else if (diffDays < 7) {
-    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
-  } else {
-    return date.toLocaleDateString();
-  }
+  return formatRelativeTime(timestamp);
 }
 
 export default Alerts;

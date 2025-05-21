@@ -214,6 +214,7 @@ const AlertDetail = () => {
               <span>{alert.location}</span>
             </div>
           )}
+          {/* Status display - only show if status exists */}
           {alert.status && (
             <div className="w-full mt-2 pt-2 border-t border-current border-opacity-20">
               <span className="font-medium capitalize">Status: {alert.status}</span>
