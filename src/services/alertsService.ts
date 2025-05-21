@@ -1,3 +1,4 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
@@ -87,7 +88,7 @@ export const formatRelativeTime = (timestamp: string): string => {
 export const useGetAlerts = (limit: number = 10) => {
   return useQuery({
     queryKey: ['alerts', limit],
-    queryFn: async () => {
+    queryFn: async (): Promise<Alert[]> => {
       const { data, error } = await supabase
         .from('alerts')
         .select('*')
@@ -101,26 +102,26 @@ export const useGetAlerts = (limit: number = 10) => {
       
       // Only process data if it exists
       if (data && data.length > 0) {
-        // Use traditional for loop to avoid complex type inference issues
         for (let i = 0; i < data.length; i++) {
           const item = data[i];
-          // Create each alert object explicitly
+          if (!item) continue;
+          
+          // Create each alert object with safe property access
           const alert: Alert = {
-            id: item.id,
-            title: item.title,
-            description: item.description,
-            type: item.alert_type,
+            id: item.id || '',
+            title: item.title || '',
+            description: item.description || '',
+            type: item.alert_type || 'other',
             alert_type: item.alert_type,
-            severity: item.severity,
-            created_at: item.created_at,
-            updated_at: item.updated_at,
-            latitude: item.latitude,
-            longitude: item.longitude, 
-            radius: item.radius,
-            location: item.latitude && item.longitude ? 
-              `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}` : 
-              undefined,
-            is_active: true,
+            severity: (item.severity as 'critical' | 'high' | 'medium' | 'low') || 'medium',
+            created_at: item.created_at || new Date().toISOString(),
+            updated_at: item.updated_at || new Date().toISOString(),
+            latitude: typeof item.latitude === 'number' ? item.latitude : undefined,
+            longitude: typeof item.longitude === 'number' ? item.longitude : undefined,
+            radius: typeof item.radius === 'number' ? item.radius : undefined,
+            location: (typeof item.latitude === 'number' && typeof item.longitude === 'number') ? 
+              `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}` : undefined,
+            is_active: Boolean(item.is_active),
             source: item.source || undefined,
             status: "Active"
           };
@@ -137,7 +138,7 @@ export const useGetAlerts = (limit: number = 10) => {
 export const useGetRecentAlerts = (limit: number = 10) => {
   return useQuery({
     queryKey: ['recent-alerts', limit],
-    queryFn: async () => {
+    queryFn: async (): Promise<Alert[]> => {
       const { data, error } = await supabase
         .from('alerts')
         .select('*')
@@ -152,26 +153,26 @@ export const useGetRecentAlerts = (limit: number = 10) => {
       
       // Only process data if it exists
       if (data && data.length > 0) {
-        // Use traditional for loop to avoid complex type inference issues
         for (let i = 0; i < data.length; i++) {
           const item = data[i];
-          // Create each alert object explicitly
+          if (!item) continue;
+          
+          // Create each alert object with safe property access
           const alert: Alert = {
-            id: item.id,
-            title: item.title,
-            description: item.description,
-            type: item.alert_type,
+            id: item.id || '',
+            title: item.title || '',
+            description: item.description || '',
+            type: item.alert_type || 'other',
             alert_type: item.alert_type,
-            severity: item.severity,
-            created_at: item.created_at,
-            updated_at: item.updated_at,
-            latitude: item.latitude,
-            longitude: item.longitude,
-            radius: item.radius,
-            location: item.latitude && item.longitude ? 
-              `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}` : 
-              undefined,
-            is_active: true,
+            severity: (item.severity as 'critical' | 'high' | 'medium' | 'low') || 'medium',
+            created_at: item.created_at || new Date().toISOString(),
+            updated_at: item.updated_at || new Date().toISOString(),
+            latitude: typeof item.latitude === 'number' ? item.latitude : undefined,
+            longitude: typeof item.longitude === 'number' ? item.longitude : undefined,
+            radius: typeof item.radius === 'number' ? item.radius : undefined,
+            location: (typeof item.latitude === 'number' && typeof item.longitude === 'number') ? 
+              `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}` : undefined,
+            is_active: Boolean(item.is_active),
             source: item.source || undefined,
             status: "Active"
           };
@@ -188,7 +189,7 @@ export const useGetRecentAlerts = (limit: number = 10) => {
 export const useGetAlertById = (alertId: string | undefined) => {
   return useQuery({
     queryKey: ['alert', alertId],
-    queryFn: async () => {
+    queryFn: async (): Promise<Alert> => {
       if (!alertId) throw new Error('Alert ID is required');
       
       const { data, error } = await supabase
@@ -198,24 +199,24 @@ export const useGetAlertById = (alertId: string | undefined) => {
         .single();
         
       if (error) throw new Error(error.message);
+      if (!data) throw new Error('Alert not found');
       
       // Create alert with explicit type to avoid deep type instantiation
       const alert: Alert = {
-        id: data.id,
-        title: data.title,
-        description: data.description,
-        type: data.alert_type,
+        id: data.id || '',
+        title: data.title || '',
+        description: data.description || '',
+        type: data.alert_type || 'other',
         alert_type: data.alert_type,
-        severity: data.severity,
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-        latitude: data.latitude,
-        longitude: data.longitude, 
-        radius: data.radius,
-        location: data.latitude && data.longitude ? 
-          `${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}` : 
-          undefined,
-        is_active: true,
+        severity: (data.severity as 'critical' | 'high' | 'medium' | 'low') || 'medium',
+        created_at: data.created_at || new Date().toISOString(),
+        updated_at: data.updated_at || new Date().toISOString(),
+        latitude: typeof data.latitude === 'number' ? data.latitude : undefined,
+        longitude: typeof data.longitude === 'number' ? data.longitude : undefined,
+        radius: typeof data.radius === 'number' ? data.radius : undefined,
+        location: (typeof data.latitude === 'number' && typeof data.longitude === 'number') ? 
+          `${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}` : undefined,
+        is_active: Boolean(data.is_active),
         source: data.source || "Official",
         status: "Active",
         updates: []
