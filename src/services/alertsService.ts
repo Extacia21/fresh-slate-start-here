@@ -1,14 +1,17 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import type { Report } from "@/integrations/supabase/reports";
 import { getReports, getReportById } from "@/integrations/supabase/reports";
 import { useEffect, useState } from 'react';
 import { toast } from "sonner";
+import type { Database } from "@/integrations/supabase/types";
 
 // Since we don't have an alerts table, we'll use reports as alerts
-export interface Alert extends Report {
+export interface Alert extends Omit<Report, 'category'> {
   severity: "critical" | "high" | "medium" | "low";
   source?: "official" | "user-reported" | string;
+  updates?: Array<{ time: string; content: string }>;
 }
 
 // Store alerts in memory to prevent losing them
@@ -65,11 +68,12 @@ export const useGetAlerts = () => {
       const alerts = data?.map(report => ({
         ...report,
         severity: report.severity || "medium",
-        source: report.user_id ? "user-reported" : "official"
+        source: report.user_id ? "user-reported" : "official",
+        updates: []
       })) as Alert[];
 
       // Update our cache
-      alertsCache = alerts;
+      alertsCache = alerts || [];
       
       return alerts;
     },
@@ -90,7 +94,8 @@ export const useGetAlerts = () => {
         const newAlert: Alert = {
           ...event.detail.report,
           severity: event.detail.report.severity || "medium",
-          source: event.detail.report.user_id ? "user-reported" : "official"
+          source: event.detail.report.user_id ? "user-reported" : "official",
+          updates: []
         };
         
         // Update local state with new alert at the top
@@ -135,12 +140,13 @@ export const useGetRecentAlerts = (limit = 10) => {
       
       // Sort by created_at (newest first) and limit
       const alerts = data
-        ?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        ?.sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime())
         .slice(0, limit)
         .map(report => ({
           ...report,
           severity: report.severity || "medium",
-          source: report.user_id ? "user-reported" : "official"
+          source: report.user_id ? "user-reported" : "official",
+          updates: []
         }));
         
       return alerts as Alert[];
@@ -162,7 +168,8 @@ export const useGetRecentAlerts = (limit = 10) => {
         const newAlert: Alert = {
           ...event.detail.report,
           severity: event.detail.report.severity || "medium",
-          source: event.detail.report.user_id ? "user-reported" : "official"
+          source: event.detail.report.user_id ? "user-reported" : "official",
+          updates: []
         };
         
         // Add new alert to local state at the top
@@ -223,7 +230,8 @@ export const useGetAlertById = (id: string | undefined) => {
       return {
         ...data,
         severity: data.severity || "medium",
-        source: data.user_id ? "user-reported" : "official"
+        source: data.user_id ? "user-reported" : "official",
+        updates: []
       } as Alert;
     },
     enabled: !!id,
@@ -249,7 +257,8 @@ export const useGetAlertById = (id: string | undefined) => {
             ...event.detail.report,
             // Preserve alert-specific fields
             severity: event.detail.report.severity || prevAlert.severity,
-            source: event.detail.report.source || prevAlert.source
+            source: event.detail.report.source || prevAlert.source,
+            updates: prevAlert.updates || []
           };
         });
       }
@@ -277,7 +286,8 @@ export const subscribeToAlerts = (callback: (alert: Alert) => void) => {
       const alert: Alert = {
         ...event.detail.report,
         severity: event.detail.report.severity || "medium",
-        source: event.detail.report.user_id ? "user-reported" : "official"
+        source: event.detail.report.user_id ? "user-reported" : "official",
+        updates: []
       };
       callback(alert);
     }

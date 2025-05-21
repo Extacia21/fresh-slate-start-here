@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { 
@@ -25,10 +24,7 @@ const AlertDetail = () => {
   useEffect(() => {
     if (alert) {
       // If alert has updates field, use it, otherwise start with empty array
-      const initialUpdates = alert.updates ? 
-        (Array.isArray(alert.updates) ? alert.updates : []) : 
-        [];
-      
+      const initialUpdates = alert.updates || [];
       setLiveUpdates(initialUpdates);
     }
   }, [alert]);
@@ -157,7 +153,7 @@ const AlertDetail = () => {
   const Icon = getIconComponent(alert.type);
   const typeColor = getAlertTypeColor(alert.type);
   const shareUrl = window.location.href;
-  const formattedTime = formatRelativeTime(alert.created_at);
+  const formattedTime = formatRelativeTime(alert.created_at || '');
 
   // Mock data for sections we don't have in the actual alert model
   const mockInstructions = [

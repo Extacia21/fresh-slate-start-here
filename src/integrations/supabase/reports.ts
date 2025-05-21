@@ -1,6 +1,8 @@
 
 import { supabase } from "./client";
+import type { Database } from "./types";
 
+// Define a new Report interface that aligns with our database schema
 export interface Report {
   id?: string;
   title: string;
@@ -17,12 +19,21 @@ export interface Report {
   updated_at?: string;
   user_id?: string;
   photos?: string[];
+  updates?: Array<{ time: string; content: string }>;
 }
 
+// Create a type for the Supabase Tables that includes our custom reports table
+type TablesWithReports = Database['public']['Tables'] & {
+  reports: {
+    Row: Omit<Report, 'updates'> & { id: string; created_at: string; updated_at: string };
+    Insert: Omit<Report, 'id' | 'created_at' | 'updated_at' | 'updates'>;
+    Update: Partial<Omit<Report, 'id' | 'created_at' | 'updated_at' | 'updates'>>;
+  }
+};
+
 export const getReports = async () => {
-  // Use explicit typing with StorageError to avoid TypeScript errors
   const { data, error } = await supabase
-    .from('reports')
+    .from('reports' as keyof TablesWithReports)
     .select('*')
     .order('created_at', { ascending: false });
   
@@ -31,7 +42,7 @@ export const getReports = async () => {
 
 export const getPublicReports = async () => {
   const { data, error } = await supabase
-    .from('reports')
+    .from('reports' as keyof TablesWithReports)
     .select('*')
     .eq('is_public', true)
     .order('created_at', { ascending: false });
@@ -39,10 +50,9 @@ export const getPublicReports = async () => {
   return { data, error };
 };
 
-// Add the missing getReportById function
 export const getReportById = async (id: string) => {
   const { data, error } = await supabase
-    .from('reports')
+    .from('reports' as keyof TablesWithReports)
     .select('*')
     .eq('id', id)
     .single();
@@ -53,21 +63,21 @@ export const getReportById = async (id: string) => {
 export const createReport = async (report: Omit<Report, 'id' | 'created_at' | 'updated_at'>) => {
   // Create the report
   const { data, error } = await supabase
-    .from('reports')
-    .insert(report)
+    .from('reports' as keyof TablesWithReports)
+    .insert(report as any)
     .select()
     .single();
   
   // Also create an alert from this report
   if (data && !error) {
     const alertData = {
-      alert_type: report.type as "police" | "fire" | "health" | "weather" | "other",
+      alert_type: report.type as Database['public']['Enums']['alert_type'],
       title: report.title,
       description: report.description,
       location: report.location,
       latitude: report.latitude,
       longitude: report.longitude,
-      severity: report.severity,
+      severity: report.severity as Database['public']['Enums']['alert_severity'],
       report_id: data.id,
       photos: report.photos,
       radius: 0, // Default radius
