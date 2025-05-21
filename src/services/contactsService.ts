@@ -242,3 +242,35 @@ export const useDeleteContact = () => {
     },
   });
 };
+
+// Add new function to create emergency contacts
+export const useAddEmergencyContact = () => {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const createContactMutation = useCreateContact();
+  
+  return useMutation({
+    mutationFn: async (contact: { 
+      name: string;
+      phone: string;
+      relationship?: string;
+      email?: string;
+    }) => {
+      if (!user) throw new Error("User not authenticated");
+      
+      // Create a regular contact with emergency type
+      const newContact = {
+        ...contact,
+        type: 'emergency',
+        is_favorite: true,
+      };
+      
+      return await createContactMutation.mutateAsync(newContact);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['contacts'],
+      });
+    },
+  });
+};

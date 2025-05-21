@@ -1,6 +1,6 @@
 
 import { useEffect, useRef, useState } from "react";
-import { MapPin, Navigation, Compass } from "lucide-react";
+import { MapPin, Navigation, Compass, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
@@ -16,25 +16,66 @@ interface LocationMapProps {
   className?: string;
   zoom?: number;
   showDirections?: boolean;
+  onLocationSelect?: (lat: number, lng: number, address: string) => void;
+  interactive?: boolean;
 }
 
 const LocationMap = ({ 
   location, 
   className = "", 
   zoom = 15, 
-  showDirections = false 
+  showDirections = false,
+  onLocationSelect,
+  interactive = false
 }: LocationMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+
+  // Get user location
+  useEffect(() => {
+    if (navigator.geolocation && interactive) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const userPos = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          setUserLocation(userPos);
+          
+          // If onLocationSelect callback is provided, call it with the user's location
+          if (onLocationSelect) {
+            // Get address from coordinates using reverse geocoding
+            if (window.google && window.google.maps) {
+              const geocoder = new window.google.maps.Geocoder();
+              geocoder.geocode({ location: userPos }, (results, status) => {
+                if (status === "OK" && results && results[0]) {
+                  onLocationSelect(userPos.lat, userPos.lng, results[0].formatted_address);
+                }
+              });
+            }
+          }
+        },
+        (error) => {
+          console.error("Error getting user location:", error);
+          if (interactive) {
+            toast.error("Could not access your location", {
+              description: "Please enable location access in your browser settings"
+            });
+          }
+        }
+      );
+    }
+  }, [interactive, mapLoaded, onLocationSelect]);
 
   useEffect(() => {
-    if (!location || !mapRef.current) return;
+    if (!mapRef.current) return;
     
     // Load the Google Maps script
     if (!window.google) {
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyC2EbJF5Ny34XOJjGuy2ASI8Z9tASdj-Ns&libraries=places`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDp9ZnLPvebOjH8MYt8f0zpqYK4mRSlAts&libraries=places`;
       script.async = true;
       script.defer = true;
       script.onload = () => {
@@ -47,47 +88,149 @@ const LocationMap = ({
   }, []);
 
   useEffect(() => {
-    if (!location || !mapLoaded || !mapRef.current) return;
+    if (!mapLoaded || !mapRef.current) return;
     
     setIsLoading(true);
-    
-    const geocoder = new window.google.maps.Geocoder();
-    geocoder.geocode({ address: location }, (results, status) => {
-      if (status === "OK" && results && results[0]) {
-        const position = results[0].geometry.location;
-        
-        const mapOptions = {
-          center: position,
-          zoom: zoom,
-          mapTypeId: window.google.maps.MapTypeId.ROADMAP,
-          mapTypeControl: false,
-          fullscreenControl: false,
-          streetViewControl: false,
-          zoomControl: true,
-          zoomControlOptions: {
-            position: window.google.maps.ControlPosition.RIGHT_TOP
-          },
-        };
-        
-        const map = new window.google.maps.Map(mapRef.current, mapOptions);
-        
-        new window.google.maps.Marker({
-          position: position,
-          map: map,
-          animation: window.google.maps.Animation.DROP,
-          title: location
-        });
-        
-        setIsLoading(false);
-      } else {
-        toast.error("Could not find location on map");
-        console.error("Geocoding error:", status);
-        setIsLoading(false);
-      }
-    });
-  }, [location, mapLoaded, zoom]);
 
-  if (!location) return null;
+    // If location is not provided but interactive mode is on, use user location
+    if (!location && userLocation && interactive) {
+      const mapOptions = {
+        center: userLocation,
+        zoom: zoom,
+        mapTypeId: window.google.maps.MapTypeId.ROADMAP,
+        mapTypeControl: false,
+        fullscreenControl: false,
+        streetViewControl: false,
+        zoomControl: true,
+        zoomControlOptions: {
+          position: window.google.maps.ControlPosition.RIGHT_TOP
+        },
+      };
+      
+      const map = new window.google.maps.Map(mapRef.current, mapOptions);
+      
+      // Add marker for user's location
+      const marker = new window.google.maps.Marker({
+        position: userLocation,
+        map: map,
+        animation: window.google.maps.Animation.DROP,
+        title: "Your location",
+        icon: {
+          path: window.google.maps.SymbolPath.CIRCLE,
+          fillColor: "#4285F4",
+          fillOpacity: 0.8,
+          strokeColor: "#ffffff",
+          strokeWeight: 2,
+          scale: 10,
+        }
+      });
+      
+      // Add info window
+      const infoWindow = new window.google.maps.InfoWindow({
+        content: "<div><strong>Your current location</strong></div>"
+      });
+      
+      marker.addListener("click", () => {
+        infoWindow.open(map, marker);
+      });
+      
+      // If the map is interactive, allow clicking to place a marker
+      if (interactive) {
+        map.addListener("click", (event: any) => {
+          // Clear existing markers (except user location)
+          marker.setMap(map);
+          
+          // Get clicked location
+          const clickedLocation = {
+            lat: event.latLng.lat(),
+            lng: event.latLng.lng()
+          };
+          
+          // Create new marker
+          const newMarker = new window.google.maps.Marker({
+            position: clickedLocation,
+            map: map,
+            animation: window.google.maps.Animation.DROP
+          });
+          
+          // Get address using reverse geocoding
+          const geocoder = new window.google.maps.Geocoder();
+          geocoder.geocode({ location: clickedLocation }, (results, status) => {
+            if (status === "OK" && results && results[0]) {
+              const address = results[0].formatted_address;
+              
+              // Update info window
+              const infoWindow = new window.google.maps.InfoWindow({
+                content: `<div><strong>Selected Location:</strong><br>${address}</div>`
+              });
+              
+              infoWindow.open(map, newMarker);
+              
+              // Call callback if provided
+              if (onLocationSelect) {
+                onLocationSelect(clickedLocation.lat, clickedLocation.lng, address);
+              }
+            }
+          });
+        });
+      }
+      
+      setIsLoading(false);
+      return;
+    }
+    
+    // If location is provided, geocode it and show on map
+    if (location) {
+      const geocoder = new window.google.maps.Geocoder();
+      geocoder.geocode({ address: location }, (results, status) => {
+        if (status === "OK" && results && results[0]) {
+          const position = results[0].geometry.location;
+          
+          const mapOptions = {
+            center: position,
+            zoom: zoom,
+            mapTypeId: window.google.maps.MapTypeId.ROADMAP,
+            mapTypeControl: false,
+            fullscreenControl: false,
+            streetViewControl: false,
+            zoomControl: true,
+            zoomControlOptions: {
+              position: window.google.maps.ControlPosition.RIGHT_TOP
+            },
+          };
+          
+          const map = new window.google.maps.Map(mapRef.current, mapOptions);
+          
+          // Add marker for the location
+          const marker = new window.google.maps.Marker({
+            position: position,
+            map: map,
+            animation: window.google.maps.Animation.DROP,
+            title: location
+          });
+          
+          // Add info window
+          const infoWindow = new window.google.maps.InfoWindow({
+            content: `<div><strong>${location}</strong></div>`
+          });
+          
+          marker.addListener("click", () => {
+            infoWindow.open(map, marker);
+          });
+          
+          setIsLoading(false);
+        } else {
+          toast.error("Could not find location on map");
+          console.error("Geocoding error:", status);
+          setIsLoading(false);
+        }
+      });
+    } else {
+      setIsLoading(false);
+    }
+  }, [location, mapLoaded, zoom, userLocation, interactive, onLocationSelect]);
+
+  if (!location && !interactive) return null;
 
   return (
     <div className={`relative rounded-lg overflow-hidden ${className}`}>
@@ -105,11 +248,13 @@ const LocationMap = ({
       )}
       
       {/* Location name */}
-      <div className="absolute bottom-2 left-0 right-0 text-center">
-        <div className="inline-block bg-background/80 text-foreground px-3 py-1 rounded-full text-sm font-medium backdrop-blur-sm">
-          {location}
+      {location && (
+        <div className="absolute bottom-2 left-0 right-0 text-center">
+          <div className="inline-block bg-background/80 text-foreground px-3 py-1 rounded-full text-sm font-medium backdrop-blur-sm">
+            {location}
+          </div>
         </div>
-      </div>
+      )}
       
       {/* Directions indicator - only show if showDirections is true */}
       {showDirections && (

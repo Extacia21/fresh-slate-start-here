@@ -1,17 +1,18 @@
 
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, AlertTriangle, MapPin, AlertCircle } from "lucide-react";
+import { ArrowLeft, AlertTriangle, MapPin, AlertCircle, Camera, X, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import LocationMap from "@/components/common/LocationMap";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateReport } from "@/services/reportsService";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const ReportIncident = () => {
   const navigate = useNavigate();
@@ -26,11 +27,20 @@ const ReportIncident = () => {
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [severity, setSeverity] = useState<"critical" | "high" | "medium" | "low">("medium");
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [photoURLs, setPhotoURLs] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Get current location on component mount
   useEffect(() => {
     getCurrentLocation();
   }, []); // Empty dependency array means this runs once on mount
+  
+  const handleLocationSelect = (lat: number, lng: number, address: string) => {
+    setLatitude(lat);
+    setLongitude(lng);
+    setLocation(address);
+  };
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,6 +62,37 @@ const ReportIncident = () => {
     setIsSubmitting(true);
     
     try {
+      // Upload photos if any
+      const uploadedPhotoURLs: string[] = [];
+      
+      if (photos.length > 0) {
+        toast.info("Uploading photos...");
+        
+        for (const photo of photos) {
+          const fileExt = photo.name.split('.').pop();
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+          const filePath = `reports/${user.id}/${fileName}`;
+          
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('reports')
+            .upload(filePath, photo);
+          
+          if (uploadError) {
+            console.error("Error uploading photo:", uploadError);
+            continue;
+          }
+          
+          // Get public URL
+          const { data: publicURLData } = supabase.storage
+            .from('reports')
+            .getPublicUrl(filePath);
+            
+          if (publicURLData && publicURLData.publicUrl) {
+            uploadedPhotoURLs.push(publicURLData.publicUrl);
+          }
+        }
+      }
+      
       const reportData = {
         title,
         description,
@@ -61,7 +102,8 @@ const ReportIncident = () => {
         latitude: latitude || undefined,
         longitude: longitude || undefined,
         is_public: true,
-        severity: severity
+        severity: severity,
+        photos: uploadedPhotoURLs.length > 0 ? uploadedPhotoURLs : undefined,
       };
       
       await createReportMutation.mutateAsync(reportData);
@@ -101,6 +143,47 @@ const ReportIncident = () => {
       setUseCurrentLocation(false);
     }
   };
+  
+  // Handle photo upload
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      // Limit to 3 photos
+      if (photos.length + e.target.files.length > 3) {
+        toast.error("You can only upload up to 3 photos");
+        return;
+      }
+      
+      // Convert FileList to array and add to photos state
+      const newPhotos = Array.from(e.target.files);
+      setPhotos([...photos, ...newPhotos]);
+      
+      // Create object URLs for preview
+      const newPhotoURLs = newPhotos.map(photo => URL.createObjectURL(photo));
+      setPhotoURLs([...photoURLs, ...newPhotoURLs]);
+    }
+  };
+  
+  // Remove photo
+  const removePhoto = (index: number) => {
+    // Revoke object URL to prevent memory leaks
+    URL.revokeObjectURL(photoURLs[index]);
+    
+    // Remove photo from arrays
+    const newPhotos = [...photos];
+    const newPhotoURLs = [...photoURLs];
+    newPhotos.splice(index, 1);
+    newPhotoURLs.splice(index, 1);
+    
+    setPhotos(newPhotos);
+    setPhotoURLs(newPhotoURLs);
+  };
+  
+  // Clean up object URLs on unmount
+  useEffect(() => {
+    return () => {
+      photoURLs.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, []);
   
   // Get current location on component mount if using current location
   useEffect(() => {
@@ -207,6 +290,54 @@ const ReportIncident = () => {
             />
           </div>
           
+          {/* Photo upload section */}
+          <div className="space-y-3">
+            <Label className="flex justify-between items-center">
+              <span>Photos <span className="text-xs text-muted-foreground">(Up to 3)</span></span>
+              <span className="text-xs text-muted-foreground">{photos.length}/3</span>
+            </Label>
+            
+            <div className="grid grid-cols-3 gap-2">
+              {/* Photo previews */}
+              {photoURLs.map((url, index) => (
+                <div key={index} className="relative aspect-square rounded-md overflow-hidden border">
+                  <img 
+                    src={url} 
+                    alt={`Photo ${index + 1}`} 
+                    className="object-cover w-full h-full"
+                  />
+                  <button 
+                    type="button"
+                    className="absolute top-1 right-1 bg-black/60 rounded-full p-1"
+                    onClick={() => removePhoto(index)}
+                  >
+                    <X className="h-3 w-3 text-white" />
+                  </button>
+                </div>
+              ))}
+              
+              {/* Upload button (only show if less than 3 photos) */}
+              {photos.length < 3 && (
+                <button
+                  type="button"
+                  className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-md aspect-square hover:bg-accent/5 transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Camera className="h-6 w-6 text-muted-foreground mb-1" />
+                  <span className="text-xs text-muted-foreground">Add photo</span>
+                  <input 
+                    ref={fileInputRef}
+                    type="file" 
+                    accept="image/*" 
+                    multiple 
+                    className="hidden" 
+                    onChange={handlePhotoUpload}
+                  />
+                </button>
+              )}
+            </div>
+          </div>
+          
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <Label>Location</Label>
@@ -233,7 +364,11 @@ const ReportIncident = () => {
             
             {useCurrentLocation ? (
               <div className="rounded-md border overflow-hidden">
-                <LocationMap location="Current Location" />
+                <LocationMap 
+                  location="Current Location" 
+                  interactive={true}
+                  onLocationSelect={handleLocationSelect}
+                />
                 <div className="p-2 bg-muted/30 text-center text-sm text-muted-foreground">
                   <MapPin className="h-3 w-3 inline mr-1" />
                   Using your current location

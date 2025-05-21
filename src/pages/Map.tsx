@@ -45,8 +45,9 @@ const Map = () => {
   const [locationFilter, setLocationFilter] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   
-  // Chinhoyi, Zimbabwe coordinates
+  // Chinhoyi, Zimbabwe coordinates (default)
   const chinhoyiCoordinates = { lat: -17.3667, lng: 30.2000 };
   
   // Mock emergency locations for Chinhoyi
@@ -116,6 +117,27 @@ const Map = () => {
       radius: 300
     }
   ];
+
+  // Get user's current location
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+          toast.info("Using your current location");
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+          toast.warning("Using default location (Chinhoyi)", {
+            description: "Enable location access for a personalized map view"
+          });
+        }
+      );
+    }
+  }, []);
   
   // Initialize Google Maps
   useEffect(() => {
@@ -126,9 +148,12 @@ const Map = () => {
       setIsLoading(true);
       
       try {
+        // Initialize the map with either user location or default coordinates
+        const mapCenter = userLocation || chinhoyiCoordinates;
+        
         // Initialize the map
         const googleMap = new window.google.maps.Map(mapRef.current as HTMLElement, {
-          center: chinhoyiCoordinates,
+          center: mapCenter,
           zoom: 14,
           mapTypeControl: false,
           fullscreenControl: true,
@@ -138,6 +163,34 @@ const Map = () => {
         
         setMap(googleMap);
         setIsLoading(false);
+        
+        // If we have user location, add a special marker for it
+        if (userLocation) {
+          const userMarker = new window.google.maps.Marker({
+            position: userLocation,
+            map: googleMap,
+            title: "Your Location",
+            icon: {
+              path: window.google.maps.SymbolPath.CIRCLE,
+              fillColor: "#4285F4",
+              fillOpacity: 0.8,
+              strokeColor: "#ffffff",
+              strokeWeight: 2,
+              scale: 10,
+            },
+            zIndex: 1000, // Ensure it's on top of other markers
+          });
+          
+          const infoWindow = new window.google.maps.InfoWindow({
+            content: `<div class="p-2">
+                        <strong>Your Current Location</strong>
+                      </div>`
+          });
+          
+          userMarker.addListener("click", () => {
+            infoWindow.open(googleMap, userMarker);
+          });
+        }
         
         // Add emergency locations markers
         addEmergencyMarkers(googleMap);
@@ -156,7 +209,7 @@ const Map = () => {
     if (!window.google || !window.google.maps) {
       // Load Google Maps script if not already loaded
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyC2EbJF5Ny34XOJjGuy2ASI8Z9tASdj-Ns&libraries=places`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDp9ZnLPvebOjH8MYt8f0zpqYK4mRSlAts&libraries=places`;
       script.async = true;
       script.defer = true;
       script.onload = loadGoogleMaps;
@@ -168,13 +221,16 @@ const Map = () => {
     } else {
       loadGoogleMaps();
     }
-  }, []);
+  }, [userLocation]);
   
   // Add emergency location markers to map
   const addEmergencyMarkers = (googleMap: any) => {
     const filteredLocations = locationFilter 
       ? emergencyLocations.filter(loc => loc.category === locationFilter) 
       : emergencyLocations;
+    
+    const markers: any[] = [];
+    const infoWindows: any[] = [];
     
     filteredLocations.forEach(location => {
       const marker = new window.google.maps.Marker({
@@ -191,21 +247,37 @@ const Map = () => {
         }
       });
       
-      marker.addListener('click', () => {
-        setSelectedLocation(location);
-        
-        // Create and open info window
-        const infoWindow = new window.google.maps.InfoWindow({
-          content: `
-            <div class="p-2">
-              <h3 class="font-semibold">${location.name}</h3>
-              <p>${location.address}</p>
-              ${location.phone ? `<p><strong>Phone:</strong> ${location.phone}</p>` : ''}
+      markers.push(marker);
+      
+      // Create info window with more details
+      const infoWindow = new window.google.maps.InfoWindow({
+        content: `
+          <div class="p-3">
+            <h3 class="font-semibold text-lg">${location.name}</h3>
+            <p class="text-sm">${location.address}</p>
+            ${location.phone ? `<p class="text-sm mt-1"><strong>Phone:</strong> ${location.phone}</p>` : ''}
+            <div class="mt-2">
+              <a href="https://www.google.com/maps/dir/?api=1&destination=${location.position.lat},${location.position.lng}" 
+                 target="_blank" 
+                 class="text-blue-600 text-sm font-medium">
+                Get Directions
+              </a>
             </div>
-          `
-        });
+          </div>
+        `
+      });
+      
+      infoWindows.push(infoWindow);
+      
+      marker.addListener('click', () => {
+        // Close any open info windows
+        infoWindows.forEach(iw => iw.close());
         
+        // Open this info window
         infoWindow.open(googleMap, marker);
+        
+        // Set selected location
+        setSelectedLocation(location);
       });
     });
   };
@@ -224,10 +296,21 @@ const Map = () => {
         radius: zone.radius,
       });
       
+      // Create info window for the alert zone
+      const infoWindow = new window.google.maps.InfoWindow({
+        content: `
+          <div class="p-3">
+            <h3 class="font-semibold text-lg">${zone.title}</h3>
+            <p class="text-sm">Type: ${zone.type}</p>
+            <p class="text-sm">Severity: ${zone.severity}</p>
+            <p class="text-sm">Radius: ${zone.radius}m</p>
+          </div>
+        `,
+        position: zone.position
+      });
+      
       alertCircle.addListener('click', () => {
-        toast.info(zone.title, {
-          description: `Alert active in this area. Take necessary precautions.`
-        });
+        infoWindow.open(googleMap);
       });
     });
   };
@@ -260,7 +343,7 @@ const Map = () => {
     
     if (map) {
       // Clear existing markers
-      map.setOptions({ center: chinhoyiCoordinates });
+      map.setOptions({ center: userLocation || chinhoyiCoordinates });
       
       // Re-add filtered markers
       addEmergencyMarkers(map);
@@ -358,6 +441,23 @@ const Map = () => {
             </div>
           )}
           
+          {/* Your current location button */}
+          {userLocation && (
+            <Button
+              className="absolute top-4 right-4 bg-primary/90 hover:bg-primary"
+              size="sm"
+              onClick={() => {
+                if (map) {
+                  map.panTo(userLocation);
+                  map.setZoom(15);
+                }
+              }}
+            >
+              <MapPin className="h-4 w-4 mr-2" />
+              Your Location
+            </Button>
+          )}
+          
           {/* Map legend */}
           <div className="absolute bottom-4 left-4 bg-background/80 rounded-md shadow-md backdrop-blur-sm p-3 text-xs">
             <h4 className="font-semibold mb-2">Map Legend</h4>
@@ -378,6 +478,12 @@ const Map = () => {
                 <span className="w-3 h-3 rounded-full opacity-40 bg-red-500 mr-2"></span>
                 <span>Alert Zones</span>
               </div>
+              {userLocation && (
+                <div className="flex items-center">
+                  <span className="w-3 h-3 rounded-full bg-blue-500 mr-2"></span>
+                  <span>Your Location</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export interface AuthCredentials {
@@ -33,6 +34,8 @@ const authService = {
               message: sessionError.message 
             };
           } else {
+            // Set last sign in time to show toast
+            setLastSignInTime();
             return {
               success: true,
               user: sessionData.user
@@ -45,6 +48,9 @@ const authService = {
           message: error.message 
         };
       }
+      
+      // Set last sign in time to show toast
+      setLastSignInTime();
       
       return { 
         success: true,
@@ -60,13 +66,25 @@ const authService = {
   
   signUp: async ({ email, password, name }: SignUpData): Promise<AuthResponse> => {
     try {
+      // Customize email template
+      const emailOptions = {
+        emailRedirectTo: window.location.origin + "/app",
+        data: {
+          email_subject: "Welcome to Crisis Connect - Please Confirm Your Email",
+          email_sender_name: "Crisis Connect Support",
+          email_sender_email: "support@crisisconnect.com",
+          name: name || email.split('@')[0]
+        }
+      };
+      
       const { data, error } = await supabase.auth.signUp({ 
         email, 
         password,
         options: {
           data: {
             full_name: name,
-          }
+          },
+          emailRedirectTo: emailOptions.emailRedirectTo
         }
       });
       
@@ -82,7 +100,7 @@ const authService = {
         user: data.user,
         message: data.user?.identities?.length === 0 ? 
           "This email is already registered. Please sign in instead." : 
-          "Account created successfully. Please check your email for confirmation."
+          "Please check your email and confirm your registration."
       };
     } catch (error: any) {
       return { 
@@ -98,7 +116,9 @@ const authService = {
   
   resetPassword: async (email: string): Promise<AuthResponse> => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + "/reset-password",
+      });
       
       if (error) {
         return {
@@ -122,7 +142,12 @@ const authService = {
 
 export default authService;
 
-// Add this function to prevent showing "Signed in successfully" toast on page refresh
+// Store the last sign in time to determine if "signed in successfully" toast should be shown
+export const setLastSignInTime = (): void => {
+  localStorage.setItem('lastSignIn', new Date().getTime().toString());
+}
+
+// Only show the sign in toast if the user just signed in (not on refresh)
 export const shouldShowSignInToast = (): boolean => {
   // Check if user just signed in or if it's a page refresh
   const lastSignIn = localStorage.getItem('lastSignIn');
@@ -136,8 +161,4 @@ export const shouldShowSignInToast = (): boolean => {
   }
   
   return false;
-}
-
-export const setLastSignInTime = (): void => {
-  localStorage.setItem('lastSignIn', new Date().getTime().toString());
 }

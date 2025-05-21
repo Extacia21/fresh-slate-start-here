@@ -14,12 +14,13 @@ export function Toaster() {
   const { toasts } = useToast()
   const [visibleToasts, setVisibleToasts] = useState<any[]>([])
   const [hiddenCount, setHiddenCount] = useState(0)
+  const maxVisibleToasts = 2;
   
   useEffect(() => {
     // Show only first 2 toasts, count the rest
-    if (toasts.length > 2) {
-      setVisibleToasts(toasts.slice(0, 2))
-      setHiddenCount(toasts.length - 2)
+    if (toasts.length > maxVisibleToasts) {
+      setVisibleToasts(toasts.slice(0, maxVisibleToasts))
+      setHiddenCount(toasts.length - maxVisibleToasts)
     } else {
       setVisibleToasts(toasts)
       setHiddenCount(0)
@@ -44,7 +45,14 @@ export function Toaster() {
       })}
       
       {hiddenCount > 0 && (
-        <div className="fixed bottom-0 right-0 mb-20 mr-4 bg-background border border-border rounded-md px-3 py-1 text-xs font-medium shadow-md">
+        <div 
+          className="fixed bottom-0 right-0 mb-20 mr-4 bg-background border border-border rounded-md px-3 py-1 text-xs font-medium shadow-md cursor-pointer z-50"
+          onClick={() => {
+            // Show all toasts when clicked
+            setVisibleToasts(toasts);
+            setHiddenCount(0);
+          }}
+        >
           +{hiddenCount} more notifications
         </div>
       )}

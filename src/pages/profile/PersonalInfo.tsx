@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { User, Mail, Phone, MapPin, Calendar } from "lucide-react";
@@ -8,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfileData } from "@/hooks/use-profile-data";
 import { useUpdateProfile } from "@/services/profileService";
+import { DatePicker } from "@/components/ui/date-picker";
 
 const PersonalInfo = () => {
   const navigate = useNavigate();
@@ -22,7 +24,7 @@ const PersonalInfo = () => {
     email: "",
     phone: "",
     address: "",
-    dob: "1985-06-15"
+    dob: undefined as Date | undefined
   });
 
   useEffect(() => {
@@ -40,6 +42,9 @@ const PersonalInfo = () => {
                   user?.email?.split('@')[0] || 
                   '');
       
+      // Parse date of birth if available
+      const dob = profileData.date_of_birth ? new Date(profileData.date_of_birth) : undefined;
+      
       setUserInfo({
         name: name,
         firstName: firstName,
@@ -47,7 +52,7 @@ const PersonalInfo = () => {
         email: user?.email || '',
         phone: profileData.phone || '',
         address: profileData.address || '',
-        dob: profileData.date_of_birth || "1985-06-15" // Use actual DOB if available
+        dob: dob
       });
     }
   }, [profileData, user]);
@@ -63,7 +68,7 @@ const PersonalInfo = () => {
         display_name: userInfo.name, // Add display name
         phone: userInfo.phone || null,
         address: userInfo.address || null,
-        date_of_birth: userInfo.dob || null // Save DOB
+        date_of_birth: userInfo.dob ? userInfo.dob.toISOString().split('T')[0] : null // Save DOB
       });
       
       // Refetch profile data to update UI
@@ -156,7 +161,7 @@ const PersonalInfo = () => {
               onChange={(e) => setUserInfo({...userInfo, address: e.target.value})}
             />
           ) : (
-            <p className="text-foreground pl-7">{userInfo.address || 'Not set'}</p>
+            <p className="text-foreground pl-7">{userInfo.address || 'No location set'}</p>
           )}
         </div>
         
@@ -166,13 +171,18 @@ const PersonalInfo = () => {
             <label className="text-sm font-medium">Date of Birth</label>
           </div>
           {isEditing ? (
-            <Input 
-              type="date"
+            <DatePicker 
               value={userInfo.dob}
-              onChange={(e) => setUserInfo({...userInfo, dob: e.target.value})}
+              onChange={(date) => setUserInfo({...userInfo, dob: date})}
+              placeholder="Select your date of birth"
+              className="w-full"
+              disableFuture={true}
+              minDate={new Date(1900, 0, 1)}
             />
           ) : (
-            <p className="text-foreground pl-7">{new Date(userInfo.dob).toLocaleDateString()}</p>
+            <p className="text-foreground pl-7">
+              {userInfo.dob ? new Date(userInfo.dob).toLocaleDateString() : 'Not set'}
+            </p>
           )}
         </div>
 
