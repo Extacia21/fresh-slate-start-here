@@ -1,7 +1,6 @@
 
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ShieldAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const SplashScreen = () => {
@@ -28,30 +27,34 @@ const SplashScreen = () => {
       navigate(isAuthenticated ? "/app" : "/signin");
     };
     
-    // Add a small delay for the splash screen effect
+    // Increased delay to 5 seconds (5000ms) for the splash screen effect
     const timer = setTimeout(() => {
       checkAuthAndRedirect();
-    }, 2000);
+    }, 5000);
 
     return () => clearTimeout(timer);
   }, [navigate]);
 
   return (
-    <div className="h-full flex flex-col items-center justify-center bg-background px-6 py-12 animate-fade-in">
+    <div className="h-full flex flex-col items-center justify-center bg-white px-6 py-12 animate-fade-in">
       <div className="flex flex-col items-center">
-        <div className="bg-primary/10 p-4 rounded-full mb-6">
-          <ShieldAlert className="text-primary h-16 w-16" />
+        <div className="mb-4">
+          <img 
+            src="/lovable-uploads/e82acee9-dbf7-403a-98e2-29bf945dc3be.png" 
+            alt="Crisis Connect Logo" 
+            className="h-32 w-auto animate-scale-in"
+          />
         </div>
-        <h1 className="text-3xl font-bold mb-2 text-foreground">CrisisReady</h1>
+        <h1 className="text-3xl font-bold mb-2 text-foreground mt-4">Crisis Connect</h1>
         <p className="text-sm text-muted-foreground text-center max-w-xs">
           Your essential companion for crisis management and emergency preparedness
         </p>
       </div>
       
       <div className="mt-12 flex items-center space-x-2">
-        <div className="h-2 w-2 rounded-full bg-primary/30 animate-pulse"></div>
-        <div className="h-2 w-2 rounded-full bg-primary/50 animate-pulse delay-100"></div>
-        <div className="h-2 w-2 rounded-full bg-primary/70 animate-pulse delay-200"></div>
+        <div className="h-2 w-2 rounded-full bg-red-600 animate-pulse"></div>
+        <div className="h-2 w-2 rounded-full bg-red-600 animate-pulse delay-100"></div>
+        <div className="h-2 w-2 rounded-full bg-red-600 animate-pulse delay-200"></div>
       </div>
     </div>
   );
