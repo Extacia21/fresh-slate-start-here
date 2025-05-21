@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, AlertTriangle, Camera, MapPin, AlertCircle, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -300,10 +299,9 @@ const ReportIncident = () => {
             
             <div className="rounded-md border overflow-hidden">
               <LocationMap 
-                location={location || "Current Location"} 
-                latitude={latitude || undefined}
-                longitude={longitude || undefined}
+                location={location || "Current Location"}
                 onLocationSelect={!useCurrentLocation ? handleLocationSelect : undefined}
+                interactive={!useCurrentLocation}
               />
             </div>
             
