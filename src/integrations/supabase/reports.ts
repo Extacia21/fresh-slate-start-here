@@ -80,7 +80,7 @@ export const createReport = async (report: Omit<Report, 'id' | 'created_at' | 'u
         latitude: report.latitude,
         longitude: report.longitude,
         severity: report.severity as Database['public']['Enums']['alert_severity'],
-        report_id: data.id,
+        report_id: (data as unknown as Report).id, // Fix: Add type assertion here
         photos: report.photos,
         radius: 0, // Default radius
         is_active: true
