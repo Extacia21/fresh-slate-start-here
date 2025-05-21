@@ -299,9 +299,8 @@ const ReportIncident = () => {
             
             <div className="rounded-md border overflow-hidden">
               <LocationMap 
-                location={location || "Current Location"} 
-                latitude={latitude || undefined}
-                longitude={longitude || undefined}
+                location={latitude && longitude ? `${latitude},${longitude}` : (location || "Current Location")} 
+                interactive={!useCurrentLocation}
                 onLocationSelect={!useCurrentLocation ? handleLocationSelect : undefined}
               />
             </div>
